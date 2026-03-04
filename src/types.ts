@@ -3,8 +3,19 @@ export type ConfigHandler = {
   handler: string;
 };
 
+export type ConfigWorkflowSteps = {
+  type: string;
+  action: string;
+};
+
+export type ConfigWorkflow = {
+  name: string;
+  steps: ConfigWorkflowSteps[];
+};
+
 export type Config = {
   events: ConfigHandler[];
+  workflows?: ConfigWorkflow[];
 };
 
 export type HandlerCtx = {

@@ -15,6 +15,33 @@
     {
       "type": "PaymentCompleted",
       "handler": "handlers/PaymentCompleted/handler.ts"
+    },
+    {
+      "type": "StockUpdate",
+      "handler": "handlers/StockUpdate/handler.ts"
+    }
+  ],
+  "workflows": [
+    {
+      "name": "ProcessOrder",
+      "steps": [
+        {
+          "type": "OrderCreated",
+          "action": "CreateOrder"
+        },
+        {
+          "type": "StockUpdate",
+          "action": "ReduceStock"
+        },
+        {
+          "type": "PaymentRequested",
+          "action": "ProcessPayment"
+        },
+        {
+          "type": "PaymentCompleted",
+          "action": "CompleteOrder"
+        }
+      ]
     }
   ]
 }

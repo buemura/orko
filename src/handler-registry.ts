@@ -1,6 +1,6 @@
 import * as path from "node:path";
 
-import { subscribeToChannel } from "./redis";
+import { publishMessage, subscribeToChannel } from "./redis";
 import type { Config, HandlerCtx, HandlerFunction } from "./types";
 
 const _dirname =
@@ -28,28 +28,39 @@ export class HandlerRegistry {
 
     if (typeof handlerFn !== "function") {
       throw new Error(
-        `Handler for "${eventType}" in ${resolvedPath} does not export a function named 'handler'`,
+        `[HandlerRegistry] - Handler for "${eventType}" in ${resolvedPath} does not export a function named 'handler'`,
       );
     }
 
     this.handlers.set(eventType, handlerFn as HandlerFunction);
-    console.log(`Handler for "${eventType}" loaded from ${resolvedPath}`);
+    console.log(
+      `[HandlerRegistry] - Handler for "${eventType}" loaded from ${resolvedPath}`,
+    );
 
     subscribeToChannel(eventType, (message: string) => {
       this.handleMessage(eventType, message);
     });
   }
 
-  private handleMessage(eventType: string, message: string): void {
+  private async handleMessage(eventType: string, message: string): Promise<void> {
     const handler = this.handlers.get(eventType);
     if (!handler) {
-      console.warn(`No handler found for event "${eventType}"`);
+      console.warn(
+        `[HandlerRegistry] - No handler found for event "${eventType}"`,
+      );
       return;
     }
 
     const event = JSON.parse(message) as HandlerCtx;
-    console.log(`Received message for event "${eventType}": ${message}`);
+    console.log(
+      `[HandlerRegistry] - Received message for event "${eventType}": ${message}`,
+    );
 
-    handler({ requestId: event.requestId, payload: event.payload });
+    await handler({ requestId: event.requestId, payload: event.payload });
+
+    publishMessage(
+      `event:${eventType}:completed`,
+      JSON.stringify({ requestId: event.requestId, payload: event.payload }),
+    );
   }
 }
