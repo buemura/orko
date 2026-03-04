@@ -1,0 +1,21 @@
+{
+  "workflows": [
+    {
+      "name": "ProcessOrder",
+      "steps": [
+        {
+          "type": "StockUpdate",
+          "action": "ReduceStock"
+        },
+        {
+          "type": "PaymentRequested",
+          "action": "ProcessPayment"
+        },
+        {
+          "type": "PaymentCompleted",
+          "action": "CompleteOrder"
+        }
+      ]
+    }
+  ]
+}

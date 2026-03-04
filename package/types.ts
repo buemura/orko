@@ -1,3 +1,8 @@
+export type MastermindOptions = {
+  redisUrl: string;
+  configPath?: string;
+};
+
 export type ConfigHandler = {
   type: string;
   handler: string;
@@ -14,7 +19,7 @@ export type ConfigWorkflow = {
 };
 
 export type Config = {
-  events: ConfigHandler[];
+  events?: ConfigHandler[];
   workflows?: ConfigWorkflow[];
 };
 

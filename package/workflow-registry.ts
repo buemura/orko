@@ -1,5 +1,5 @@
-import { getCache, publishMessage, setCache, subscribeToChannel } from "./redis";
-import type { Config, ConfigWorkflow, ConfigWorkflowSteps } from "./types";
+import type { RedisManager } from "./redis.js";
+import type { Config, ConfigWorkflow, ConfigWorkflowSteps } from "./types.js";
 
 type WorkflowState = {
   workflowName: string;
@@ -9,7 +9,12 @@ type WorkflowState = {
 
 export class WorkflowRegistry {
   private workflows = new Map<string, ConfigWorkflow>();
-  private eventToWorkflows = new Map<string, { workflow: ConfigWorkflow; stepIndex: number }[]>();
+  private eventToWorkflows = new Map<
+    string,
+    { workflow: ConfigWorkflow; stepIndex: number }[]
+  >();
+
+  constructor(private redis: RedisManager) {}
 
   async registerFromConfig(config: Config): Promise<void> {
     for (const workflow of config.workflows ?? []) {
@@ -26,7 +31,9 @@ export class WorkflowRegistry {
       }
 
       this.subscribeToWorkflowEvents(workflow);
-      console.log(`[WorkflowRegistry] - Workflow "${workflow.name}" registered with ${workflow.steps.length} steps`);
+      console.log(
+        `[WorkflowRegistry] - Workflow "${workflow.name}" registered with ${workflow.steps.length} steps`,
+      );
     }
   }
 
@@ -34,10 +41,16 @@ export class WorkflowRegistry {
     return this.workflows.has(name);
   }
 
-  async startWorkflow(workflowName: string, requestId: string, payload: unknown): Promise<void> {
+  async startWorkflow(
+    workflowName: string,
+    requestId: string,
+    payload: unknown,
+  ): Promise<void> {
     const workflow = this.workflows.get(workflowName);
     if (!workflow) {
-      throw new Error(`[WorkflowRegistry] - Workflow "${workflowName}" not found`);
+      throw new Error(
+        `[WorkflowRegistry] - Workflow "${workflowName}" not found`,
+      );
     }
 
     const state: WorkflowState = {
@@ -48,9 +61,14 @@ export class WorkflowRegistry {
     await this.saveState(requestId, state);
 
     const firstStep = workflow.steps[0]!;
-    console.log(`[WorkflowRegistry] - Starting workflow "${workflowName}" (requestId: ${requestId}), publishing "${firstStep.type}"`);
+    console.log(
+      `[WorkflowRegistry] - Starting workflow "${workflowName}" (requestId: ${requestId}), publishing "${firstStep.type}"`,
+    );
 
-    publishMessage(firstStep.type, JSON.stringify({ requestId, payload }));
+    this.redis.publishMessage(
+      firstStep.type,
+      JSON.stringify({ requestId, payload }),
+    );
   }
 
   private subscribeToWorkflowEvents(workflow: ConfigWorkflow): void {
@@ -58,7 +76,7 @@ export class WorkflowRegistry {
       const step = workflow.steps[i]!;
       const completionChannel = this.completionChannel(step);
 
-      subscribeToChannel(completionChannel, (message: string) => {
+      this.redis.subscribeToChannel(completionChannel, (message: string) => {
         this.handleStepCompletion(workflow, i, message);
       });
     }
@@ -69,7 +87,10 @@ export class WorkflowRegistry {
     stepIndex: number,
     message: string,
   ): Promise<void> {
-    const { requestId, payload } = JSON.parse(message) as { requestId: string; payload: unknown };
+    const { requestId, payload } = JSON.parse(message) as {
+      requestId: string;
+      payload: unknown;
+    };
 
     const state = await this.getState(requestId);
     if (!state || state.workflowName !== workflow.name) {
@@ -89,7 +110,9 @@ export class WorkflowRegistry {
       state.status = "completed";
       state.currentStep = stepIndex;
       await this.saveState(requestId, state);
-      console.log(`[WorkflowRegistry] - Workflow "${workflow.name}" completed (requestId: ${requestId})`);
+      console.log(
+        `[WorkflowRegistry] - Workflow "${workflow.name}" completed (requestId: ${requestId})`,
+      );
       return;
     }
 
@@ -101,7 +124,10 @@ export class WorkflowRegistry {
       `[WorkflowRegistry] - Workflow "${workflow.name}" advancing to step ${nextStepIndex}: "${nextStep.type}" (requestId: ${requestId})`,
     );
 
-    publishMessage(nextStep.type, JSON.stringify({ requestId, payload }));
+    this.redis.publishMessage(
+      nextStep.type,
+      JSON.stringify({ requestId, payload }),
+    );
   }
 
   private completionChannel(step: ConfigWorkflowSteps): string {
@@ -112,12 +138,19 @@ export class WorkflowRegistry {
     return `workflow:state:${requestId}`;
   }
 
-  private async saveState(requestId: string, state: WorkflowState): Promise<void> {
-    await setCache(this.stateKey(requestId), JSON.stringify(state), 86400);
+  private async saveState(
+    requestId: string,
+    state: WorkflowState,
+  ): Promise<void> {
+    await this.redis.setCache(
+      this.stateKey(requestId),
+      JSON.stringify(state),
+      86400,
+    );
   }
 
   private async getState(requestId: string): Promise<WorkflowState | null> {
-    const raw = await getCache(this.stateKey(requestId));
+    const raw = await this.redis.getCache(this.stateKey(requestId));
     if (!raw) return null;
     return JSON.parse(raw) as WorkflowState;
   }

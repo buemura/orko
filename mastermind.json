@@ -26,10 +26,6 @@
       "name": "ProcessOrder",
       "steps": [
         {
-          "type": "OrderCreated",
-          "action": "CreateOrder"
-        },
-        {
           "type": "StockUpdate",
           "action": "ReduceStock"
         },
