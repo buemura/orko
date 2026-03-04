@@ -1,26 +1,22 @@
-export type MastermindOptions = {
-  redisUrl: string;
-  configPath?: string;
-};
-
-export type ConfigHandler = {
+export type SynkroEvent = {
   type: string;
-  handler: string;
+  handler: HandlerFunction;
 };
 
-export type ConfigWorkflowSteps = {
+export type SynkroWorkflowStep = {
   type: string;
-  action: string;
+  handler: HandlerFunction;
 };
 
-export type ConfigWorkflow = {
+export type SynkroWorkflow = {
   name: string;
-  steps: ConfigWorkflowSteps[];
+  steps: SynkroWorkflowStep[];
 };
 
-export type Config = {
-  events?: ConfigHandler[];
-  workflows?: ConfigWorkflow[];
+export type SynkroOptions = {
+  redisUrl: string;
+  events?: SynkroEvent[];
+  workflows?: SynkroWorkflow[];
 };
 
 export type HandlerCtx = {

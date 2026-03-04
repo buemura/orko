@@ -1,13 +1,12 @@
 import { randomUUID } from "node:crypto";
 
-import { loadConfig } from "./config.js";
 import { HandlerRegistry } from "./handler-registry.js";
 import { RedisManager } from "./redis.js";
 import { WorkflowRegistry } from "./workflow-registry.js";
 
-import type { HandlerFunction, MastermindOptions } from "./types.js";
+import type { HandlerFunction, SynkroOptions } from "./types.js";
 
-export class Mastermind {
+export class Synkro {
   private redis: RedisManager;
   private handlerRegistry: HandlerRegistry;
   private workflowRegistry: WorkflowRegistry;
@@ -15,17 +14,21 @@ export class Mastermind {
   private constructor(redis: RedisManager) {
     this.redis = redis;
     this.handlerRegistry = new HandlerRegistry(redis);
-    this.workflowRegistry = new WorkflowRegistry(redis);
+    this.workflowRegistry = new WorkflowRegistry(redis, this.handlerRegistry);
   }
 
-  static async start(options: MastermindOptions): Promise<Mastermind> {
+  static async start(options: SynkroOptions): Promise<Synkro> {
     const redis = new RedisManager(options.redisUrl);
-    const instance = new Mastermind(redis);
+    const instance = new Synkro(redis);
 
-    if (options.configPath !== undefined) {
-      const config = loadConfig(options.configPath);
-      await instance.handlerRegistry.registerFromConfig(config);
-      await instance.workflowRegistry.registerFromConfig(config);
+    if (options.events) {
+      for (const event of options.events) {
+        instance.on(event.type, event.handler);
+      }
+    }
+
+    if (options.workflows) {
+      instance.workflowRegistry.registerWorkflows(options.workflows);
     }
 
     return instance;
@@ -56,11 +59,10 @@ export class Mastermind {
 }
 
 export type {
-  Config,
-  ConfigHandler,
-  ConfigWorkflow,
-  ConfigWorkflowSteps,
   HandlerCtx,
   HandlerFunction,
-  MastermindOptions,
+  SynkroEvent,
+  SynkroOptions,
+  SynkroWorkflow,
+  SynkroWorkflowStep,
 } from "./types.js";

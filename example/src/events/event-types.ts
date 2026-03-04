@@ -1,3 +1,7 @@
+export enum WorkflowTypes {
+  ProcessOrder = "ProcessOrder",
+}
+
 export enum EventTypes {
   // Order events
   OrderCreated = "OrderCreated",

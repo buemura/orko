@@ -1,5 +1,6 @@
+import type { HandlerRegistry } from "./handler-registry.js";
 import type { RedisManager } from "./redis.js";
-import type { Config, ConfigWorkflow, ConfigWorkflowSteps } from "./types.js";
+import type { SynkroWorkflow } from "./types.js";
 
 type WorkflowState = {
   workflowName: string;
@@ -8,16 +9,19 @@ type WorkflowState = {
 };
 
 export class WorkflowRegistry {
-  private workflows = new Map<string, ConfigWorkflow>();
+  private workflows = new Map<string, SynkroWorkflow>();
   private eventToWorkflows = new Map<
     string,
-    { workflow: ConfigWorkflow; stepIndex: number }[]
+    { workflow: SynkroWorkflow; stepIndex: number }[]
   >();
 
-  constructor(private redis: RedisManager) {}
+  constructor(
+    private redis: RedisManager,
+    private handlerRegistry: HandlerRegistry,
+  ) {}
 
-  async registerFromConfig(config: Config): Promise<void> {
-    for (const workflow of config.workflows ?? []) {
+  registerWorkflows(workflows: SynkroWorkflow[]): void {
+    for (const workflow of workflows) {
       this.workflows.set(workflow.name, workflow);
 
       for (let i = 0; i < workflow.steps.length; i++) {
@@ -28,6 +32,9 @@ export class WorkflowRegistry {
           this.eventToWorkflows.set(key, []);
         }
         this.eventToWorkflows.get(key)!.push({ workflow, stepIndex: i });
+
+        const channel = this.stepChannel(workflow.name, step.type);
+        this.handlerRegistry.register(channel, step.handler);
       }
 
       this.subscribeToWorkflowEvents(workflow);
@@ -61,20 +68,22 @@ export class WorkflowRegistry {
     await this.saveState(requestId, state);
 
     const firstStep = workflow.steps[0]!;
+    const channel = this.stepChannel(workflowName, firstStep.type);
     console.log(
       `[WorkflowRegistry] - Starting workflow "${workflowName}" (requestId: ${requestId}), publishing "${firstStep.type}"`,
     );
 
     this.redis.publishMessage(
-      firstStep.type,
+      channel,
       JSON.stringify({ requestId, payload }),
     );
   }
 
-  private subscribeToWorkflowEvents(workflow: ConfigWorkflow): void {
+  private subscribeToWorkflowEvents(workflow: SynkroWorkflow): void {
     for (let i = 0; i < workflow.steps.length; i++) {
       const step = workflow.steps[i]!;
-      const completionChannel = this.completionChannel(step);
+      const channel = this.stepChannel(workflow.name, step.type);
+      const completionChannel = `event:${channel}:completed`;
 
       this.redis.subscribeToChannel(completionChannel, (message: string) => {
         this.handleStepCompletion(workflow, i, message);
@@ -83,7 +92,7 @@ export class WorkflowRegistry {
   }
 
   private async handleStepCompletion(
-    workflow: ConfigWorkflow,
+    workflow: SynkroWorkflow,
     stepIndex: number,
     message: string,
   ): Promise<void> {
@@ -120,18 +129,19 @@ export class WorkflowRegistry {
     await this.saveState(requestId, state);
 
     const nextStep = workflow.steps[nextStepIndex]!;
+    const nextChannel = this.stepChannel(workflow.name, nextStep.type);
     console.log(
       `[WorkflowRegistry] - Workflow "${workflow.name}" advancing to step ${nextStepIndex}: "${nextStep.type}" (requestId: ${requestId})`,
     );
 
     this.redis.publishMessage(
-      nextStep.type,
+      nextChannel,
       JSON.stringify({ requestId, payload }),
     );
   }
 
-  private completionChannel(step: ConfigWorkflowSteps): string {
-    return `event:${step.type}:completed`;
+  private stepChannel(workflowName: string, stepType: string): string {
+    return `workflow:${workflowName}:${stepType}`;
   }
 
   private stateKey(requestId: string): string {

@@ -1,8 +1,6 @@
-import { HandlerCtx } from "@mastermind/core";
-import { eq } from "drizzle-orm";
+import { HandlerCtx } from "@synkro/core";
 
 import { db } from "../../db";
-import { orders, payments } from "../../db/schema";
 
 export async function paymentRequestedHandler(ctx: HandlerCtx) {
   const { orderId, amount } = ctx.payload as {
@@ -12,14 +10,13 @@ export async function paymentRequestedHandler(ctx: HandlerCtx) {
 
   console.log(`Payment requested for order: ${orderId}`);
 
-  await db.insert(payments).values({
+  await new Promise((resolve) => setTimeout(resolve, 2000));
+
+  db.insertPayment({
     orderId,
     amount: String(amount),
     status: "pending",
   });
 
-  await db
-    .update(orders)
-    .set({ status: "processing", updatedAt: new Date() })
-    .where(eq(orders.id, orderId));
+  db.updateOrderStatus(orderId, "processing");
 }

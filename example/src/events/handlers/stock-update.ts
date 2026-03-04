@@ -1,8 +1,6 @@
-import { HandlerCtx } from "@mastermind/core";
-import { eq, sql } from "drizzle-orm";
+import { HandlerCtx } from "@synkro/core";
 
 import { db } from "../../db";
-import { products } from "../../db/schema";
 
 export async function stockUpdateHandler(ctx: HandlerCtx) {
   const { productId, quantity } = ctx.payload as {
@@ -12,11 +10,7 @@ export async function stockUpdateHandler(ctx: HandlerCtx) {
 
   console.log(`Stock update for product: ${productId}, quantity: ${quantity}`);
 
-  await db
-    .update(products)
-    .set({
-      stock: sql`${products.stock} - ${quantity}`,
-      updatedAt: new Date(),
-    })
-    .where(eq(products.id, productId));
+  await new Promise((resolve) => setTimeout(resolve, 2000));
+
+  db.updateProductStock(productId, quantity);
 }

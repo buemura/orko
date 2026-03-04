@@ -8,22 +8,16 @@
   "main": "index.js",
   "scripts": {
     "build": "tsc",
-    "dev": "tsx watch src/index.ts",
-    "db:push": "drizzle-kit push",
-    "db:seed": "tsx src/db/seed.ts"
+    "dev": "tsx watch src/index.ts"
   },
   "devDependencies": {
     "@types/node": "^25.3.3",
-    "@types/pg": "^8.18.0",
-    "drizzle-kit": "^0.31.9",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"
   },
   "dependencies": {
-    "@mastermind/core": "file:../mastermind-core-0.1.0.tgz",
+    "@synkro/core": "file:../synkro-core-0.1.0.tgz",
     "dotenv": "^17.3.1",
-    "drizzle-orm": "^0.45.1",
-    "express": "^5.2.1",
-    "pg": "^8.19.0"
+    "express": "^5.2.1"
   }
 }
