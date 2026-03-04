@@ -38,8 +38,12 @@ export class Synkro {
     this.handlerRegistry.register(eventType, handler);
   }
 
-  async publish(event: string, payload?: unknown): Promise<string> {
-    const requestId = randomUUID();
+  async publish(
+    event: string,
+    payload?: unknown,
+    requestId?: string,
+  ): Promise<string> {
+    requestId = requestId ?? randomUUID();
 
     if (this.workflowRegistry.hasWorkflow(event)) {
       await this.workflowRegistry.startWorkflow(event, requestId, payload);
