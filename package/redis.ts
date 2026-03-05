@@ -2,7 +2,9 @@ import { Redis } from "ioredis";
 
 import { logger } from "./logger.js";
 
-export class RedisManager {
+import type { TransportManager } from "./transport.js";
+
+export class RedisManager implements TransportManager {
   private publisher: Redis;
   private subscriber: Redis;
   private cacheClient: Redis;

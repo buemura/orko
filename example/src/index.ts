@@ -4,7 +4,6 @@ import express, { Request, Response } from "express";
 
 import { db } from "./db";
 import { eventManagerSetup } from "./events/event-manager";
-import { EventTypes } from "./events/event-types";
 
 const app = express();
 const PORT = 3000;
@@ -54,10 +53,11 @@ app.get("/orders/:orderId/payments", async (req: Request, res: Response) => {
 });
 
 app.post("/publish", async (req: Request, res: Response) => {
+  const { eventType, payload } = req.body;
+
   const synkro = await eventManagerSetup();
-  await synkro.publish(EventTypes.StockUpdate, {
-    test: "This is a test payload for StockUpdate event",
-  });
+  await synkro.publish(eventType, payload);
+
   res.status(201).json(null);
 });
 

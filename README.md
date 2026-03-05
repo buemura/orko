@@ -1,14 +1,15 @@
 # @synkro/core
 
-Lightweight workflow and state machine orchestrator powered by Redis. Define event-driven workflows via configuration or code.
+Lightweight workflow and state machine orchestrator. Define event-driven workflows via configuration or code. Supports Redis and in-memory transports.
 
 ## Features
 
-- **Standalone Events** — Simple pub/sub event handlers with Redis
-- **Sequential Workflows** — Multi-step workflows that execute in order, with state tracked in Redis
+- **Standalone Events** — Simple pub/sub event handlers
+- **Sequential Workflows** — Multi-step workflows that execute in order, with state persistence
 - **Conditional Routing** — Branch to different steps based on handler success or failure
 - **Workflow Chaining** — Trigger follow-up workflows on completion, success, or failure
 - **Retry Support** — Configurable retry logic per step
+- **Transport Options** — Redis for production or in-memory for simple projects and local development
 - **Simple API** — Single `Synkro` class with minimal configuration
 - **TypeScript** — Full type support out of the box
 
@@ -18,14 +19,37 @@ Lightweight workflow and state machine orchestrator powered by Redis. Define eve
 npm install @synkro/core
 ```
 
-> Requires a running Redis instance.
-
 ## Quick Start
+
+### In-Memory (no external dependencies)
 
 ```ts
 import { Synkro } from "@synkro/core";
 
 const synkro = await Synkro.start({
+  transport: "in-memory",
+  events: [
+    {
+      type: "UserSignedUp",
+      handler: async (ctx) => {
+        console.log("New user:", ctx.payload);
+      },
+    },
+  ],
+});
+
+await synkro.publish("UserSignedUp", { email: "user@example.com" });
+```
+
+### Redis (scalable, multi-instance)
+
+> Requires a running Redis instance.
+
+```ts
+import { Synkro } from "@synkro/core";
+
+const synkro = await Synkro.start({
+  transport: "redis",
   redisUrl: "redis://localhost:6379",
   events: [
     {
@@ -40,12 +64,15 @@ const synkro = await Synkro.start({
 await synkro.publish("UserSignedUp", { email: "user@example.com" });
 ```
 
+> The in-memory transport is ideal for simple projects, local development, and testing. For production workloads that require scaling across multiple instances, use Redis.
+
 ## Workflows
 
-Define multi-step sequential workflows. Each step runs after the previous one completes, with state persisted in Redis.
+Define multi-step sequential workflows. Each step runs after the previous one completes, with state automatically persisted.
 
 ```ts
 const synkro = await Synkro.start({
+  transport: "redis",
   redisUrl: "redis://localhost:6379",
   workflows: [
     {
@@ -193,7 +220,8 @@ Creates and returns a running instance.
 
 ```ts
 type SynkroOptions = {
-  redisUrl: string;
+  transport: "redis" | "in-memory";
+  redisUrl?: string; // required when transport is "redis"
   debug?: boolean;
   events?: SynkroEvent[];
   workflows?: SynkroWorkflow[];
@@ -247,7 +275,7 @@ synkro.on("ValidateStock", async (ctx) => {
 
 ### `synkro.stop(): Promise<void>`
 
-Disconnects all Redis clients.
+Disconnects the transport and cleans up resources.
 
 ## Types
 

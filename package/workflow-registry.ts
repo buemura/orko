@@ -1,7 +1,7 @@
 import { logger } from "./logger.js";
 
 import type { HandlerRegistry } from "./handler-registry.js";
-import type { RedisManager } from "./redis.js";
+import type { TransportManager } from "./transport.js";
 import type { SynkroWorkflow } from "./types.js";
 
 type WorkflowState = {
@@ -19,7 +19,7 @@ export class WorkflowRegistry {
   >();
 
   constructor(
-    private redis: RedisManager,
+    private redis: TransportManager,
     private handlerRegistry: HandlerRegistry,
   ) {}
 

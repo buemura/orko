@@ -1,6 +1,6 @@
 import { logger } from "./logger.js";
 
-import type { RedisManager } from "./redis.js";
+import type { TransportManager } from "./transport.js";
 import type {
   HandlerCtx,
   HandlerFunction,
@@ -18,7 +18,7 @@ export class HandlerRegistry {
 
   private publishFn: PublishFunction | null = null;
 
-  constructor(private redis: RedisManager) {}
+  constructor(private redis: TransportManager) {}
 
   setPublishFn(fn: PublishFunction): void {
     this.publishFn = fn;

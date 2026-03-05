@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import { HandlerRegistry } from "./handler-registry.js";
+import { InMemoryManager } from "./in-memory.js";
 import { setDebug } from "./logger.js";
 import { RedisManager } from "./redis.js";
 import { WorkflowRegistry } from "./workflow-registry.js";
@@ -10,23 +11,34 @@ import type {
   RetryConfig,
   SynkroOptions,
 } from "./types.js";
+import type { TransportManager } from "./transport.js";
 
 export class Synkro {
-  private redis: RedisManager;
+  private transport: TransportManager;
   private handlerRegistry: HandlerRegistry;
   private workflowRegistry: WorkflowRegistry;
 
-  private constructor(redis: RedisManager) {
-    this.redis = redis;
-    this.handlerRegistry = new HandlerRegistry(redis);
-    this.workflowRegistry = new WorkflowRegistry(redis, this.handlerRegistry);
+  private constructor(transport: TransportManager) {
+    this.transport = transport;
+    this.handlerRegistry = new HandlerRegistry(transport);
+    this.workflowRegistry = new WorkflowRegistry(transport, this.handlerRegistry);
     this.handlerRegistry.setPublishFn(this.publish.bind(this));
   }
 
   static async start(options: SynkroOptions): Promise<Synkro> {
     setDebug(options.debug ?? false);
-    const redis = new RedisManager(options.redisUrl);
-    const instance = new Synkro(redis);
+
+    let transport: TransportManager;
+    if (options.transport === "in-memory") {
+      transport = new InMemoryManager();
+    } else {
+      if (!options.redisUrl) {
+        throw new Error("redisUrl is required when using Redis transport");
+      }
+      transport = new RedisManager(options.redisUrl);
+    }
+
+    const instance = new Synkro(transport);
 
     if (options.events) {
       for (const event of options.events) {
@@ -57,7 +69,7 @@ export class Synkro {
       return requestId;
     }
 
-    this.redis.publishMessage(
+    this.transport.publishMessage(
       event,
       JSON.stringify({ requestId, payload }),
     );
@@ -65,10 +77,11 @@ export class Synkro {
   }
 
   async stop(): Promise<void> {
-    await this.redis.disconnect();
+    await this.transport.disconnect();
   }
 }
 
+export type { TransportManager } from "./transport.js";
 export type {
   HandlerCtx,
   HandlerFunction,
