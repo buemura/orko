@@ -13,6 +13,7 @@ function createMockRedis(): RedisManager {
     getCache: vi.fn(),
     setCache: vi.fn(),
     deleteCache: vi.fn(),
+    incrementCache: vi.fn(),
     disconnect: vi.fn(),
   } as unknown as RedisManager;
 }
@@ -86,7 +87,8 @@ describe("HandlerRegistry", () => {
         payload: { name: "Alice" },
       });
 
-      await messageCallback(message);
+      messageCallback(message);
+      await flushPromises();
 
       expect(mockRedis.publishMessage).toHaveBeenCalledWith(
         "event:user:created:completed",
@@ -110,7 +112,8 @@ describe("HandlerRegistry", () => {
         payload: null,
       });
 
-      await messageCallback(message);
+      messageCallback(message);
+      await flushPromises();
 
       expect(handler).toHaveBeenCalledWith(
         expect.objectContaining({
