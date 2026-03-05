@@ -1,5 +1,7 @@
 import { Redis } from "ioredis";
 
+import { logger } from "./logger.js";
+
 export class RedisManager {
   private publisher: Redis;
   private subscriber: Redis;
@@ -22,12 +24,12 @@ export class RedisManager {
     this.subscriber
       .subscribe(channel)
       .then((count) => {
-        console.log(
+        logger.debug(
           `Subscribed to ${count} channel(s). Listening on "${channel}".`,
         );
       })
       .catch((err: unknown) => {
-        console.error(`Failed to subscribe to channel ${channel}:`, err);
+        logger.error(`Failed to subscribe to channel ${channel}:`, err);
       });
 
     this.subscriber.on("message", (chan: string, message: string) => {

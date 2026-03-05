@@ -1,3 +1,5 @@
+import { logger } from "./logger.js";
+
 import type { HandlerRegistry } from "./handler-registry.js";
 import type { RedisManager } from "./redis.js";
 import type { SynkroWorkflow } from "./types.js";
@@ -38,7 +40,7 @@ export class WorkflowRegistry {
       }
 
       this.subscribeToWorkflowEvents(workflow);
-      console.log(
+      logger.debug(
         `[WorkflowRegistry] - Workflow "${workflow.name}" registered with ${workflow.steps.length} steps`,
       );
     }
@@ -69,7 +71,7 @@ export class WorkflowRegistry {
 
     const firstStep = workflow.steps[0]!;
     const channel = this.stepChannel(workflowName, firstStep.type);
-    console.log(
+    logger.debug(
       `[WorkflowRegistry] - Starting workflow "${workflowName}" (requestId: ${requestId}), publishing "${firstStep.type}"`,
     );
 
@@ -107,7 +109,7 @@ export class WorkflowRegistry {
     }
 
     if (state.currentStep !== stepIndex) {
-      console.warn(
+      logger.warn(
         `[WorkflowRegistry] - Step mismatch for "${workflow.name}" (requestId: ${requestId}): expected step ${state.currentStep}, got ${stepIndex}`,
       );
       return;
@@ -119,7 +121,7 @@ export class WorkflowRegistry {
       state.status = "completed";
       state.currentStep = stepIndex;
       await this.saveState(requestId, state);
-      console.log(
+      logger.debug(
         `[WorkflowRegistry] - Workflow "${workflow.name}" completed (requestId: ${requestId})`,
       );
       return;
@@ -130,7 +132,7 @@ export class WorkflowRegistry {
 
     const nextStep = workflow.steps[nextStepIndex]!;
     const nextChannel = this.stepChannel(workflow.name, nextStep.type);
-    console.log(
+    logger.debug(
       `[WorkflowRegistry] - Workflow "${workflow.name}" advancing to step ${nextStepIndex}: "${nextStep.type}" (requestId: ${requestId})`,
     );
 

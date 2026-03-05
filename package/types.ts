@@ -15,6 +15,7 @@ export type SynkroWorkflow = {
 
 export type SynkroOptions = {
   redisUrl: string;
+  debug?: boolean;
   events?: SynkroEvent[];
   workflows?: SynkroWorkflow[];
 };

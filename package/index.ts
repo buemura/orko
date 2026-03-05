@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import { HandlerRegistry } from "./handler-registry.js";
+import { setDebug } from "./logger.js";
 import { RedisManager } from "./redis.js";
 import { WorkflowRegistry } from "./workflow-registry.js";
 
@@ -18,6 +19,7 @@ export class Synkro {
   }
 
   static async start(options: SynkroOptions): Promise<Synkro> {
+    setDebug(options.debug ?? false);
     const redis = new RedisManager(options.redisUrl);
     const instance = new Synkro(redis);
 
