@@ -46,3 +46,35 @@ export type HandlerCtx = {
 };
 
 export type HandlerFunction = (ctx: HandlerCtx) => void | Promise<void>;
+
+export type EventInfo = {
+  type: string;
+  retry?: RetryConfig;
+};
+
+export type WorkflowStepInfo = {
+  type: string;
+  retry?: RetryConfig;
+  onSuccess?: string;
+  onFailure?: string;
+};
+
+export type WorkflowInfo = {
+  name: string;
+  steps: WorkflowStepInfo[];
+  onComplete?: string;
+  onSuccess?: string;
+  onFailure?: string;
+};
+
+export type SynkroIntrospection = {
+  events: EventInfo[];
+  workflows: WorkflowInfo[];
+};
+
+export type EventMetrics = {
+  type: string;
+  received: number;
+  completed: number;
+  failed: number;
+};

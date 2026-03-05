@@ -61,6 +61,10 @@ export class RedisManager implements TransportManager {
     await this.cacheClient.del(key);
   }
 
+  async incrementCache(key: string): Promise<number> {
+    return await this.cacheClient.incr(key);
+  }
+
   async disconnect(): Promise<void> {
     await this.publisher.quit();
     await this.subscriber.quit();

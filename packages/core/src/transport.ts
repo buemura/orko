@@ -7,5 +7,6 @@ export interface TransportManager {
   getCache(key: string): Promise<string | null>;
   setCache(key: string, value: string, ttlSeconds?: number): Promise<void>;
   deleteCache(key: string): Promise<void>;
+  incrementCache(key: string): Promise<number>;
   disconnect(): Promise<void>;
 }

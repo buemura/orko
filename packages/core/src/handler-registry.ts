@@ -2,6 +2,8 @@ import { logger } from "./logger.js";
 
 import type { TransportManager } from "./transport.js";
 import type {
+  EventInfo,
+  EventMetrics,
   HandlerCtx,
   HandlerFunction,
   PublishFunction,
@@ -22,6 +24,29 @@ export class HandlerRegistry {
 
   setPublishFn(fn: PublishFunction): void {
     this.publishFn = fn;
+  }
+
+  async getEventMetrics(eventType: string): Promise<EventMetrics> {
+    const [received, completed, failed] = await Promise.all([
+      this.redis.getCache(`synkro:metrics:${eventType}:received`),
+      this.redis.getCache(`synkro:metrics:${eventType}:completed`),
+      this.redis.getCache(`synkro:metrics:${eventType}:failed`),
+    ]);
+    return {
+      type: eventType,
+      received: Number(received ?? 0),
+      completed: Number(completed ?? 0),
+      failed: Number(failed ?? 0),
+    };
+  }
+
+  getRegisteredEvents(): EventInfo[] {
+    return Array.from(this.handlers.entries())
+      .filter(([type]) => !type.startsWith("workflow:"))
+      .map(([type, entry]) => ({
+        type,
+        ...(entry.retry && { retry: entry.retry }),
+      }));
   }
 
   register(
@@ -50,6 +75,11 @@ export class HandlerRegistry {
 
     const event = JSON.parse(message) as { requestId: string; payload: unknown };
     const maxRetries = entry.retry?.maxRetries ?? 0;
+    const trackMetrics = !eventType.startsWith("workflow:");
+
+    if (trackMetrics) {
+      await this.redis.incrementCache(`synkro:metrics:${eventType}:received`);
+    }
 
     const ctx: HandlerCtx = {
       requestId: event.requestId,
@@ -67,6 +97,9 @@ export class HandlerRegistry {
       try {
         await entry.handler(ctx);
 
+        if (trackMetrics) {
+          await this.redis.incrementCache(`synkro:metrics:${eventType}:completed`);
+        }
         this.redis.publishMessage(
           `event:${eventType}:completed`,
           JSON.stringify({
@@ -85,6 +118,9 @@ export class HandlerRegistry {
             `[HandlerRegistry] - Handler "${eventType}" failed after ${maxRetries + 1} attempt(s): ${error}`,
           );
 
+          if (trackMetrics) {
+            await this.redis.incrementCache(`synkro:metrics:${eventType}:failed`);
+          }
           this.redis.publishMessage(
             `event:${eventType}:failed`,
             JSON.stringify({

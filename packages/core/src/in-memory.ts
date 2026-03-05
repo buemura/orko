@@ -44,6 +44,13 @@ export class InMemoryManager implements TransportManager {
     this.cache.delete(key);
   }
 
+  async incrementCache(key: string): Promise<number> {
+    const current = Number(this.cache.get(key) ?? 0);
+    const next = current + 1;
+    this.cache.set(key, String(next));
+    return next;
+  }
+
   async disconnect(): Promise<void> {
     this.subscriptions.clear();
     this.cache.clear();

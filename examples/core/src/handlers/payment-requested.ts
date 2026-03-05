@@ -1,6 +1,6 @@
 import { HandlerCtx } from "@synkro/core";
 
-import { db } from "../../db";
+import { db } from "../db";
 
 export async function paymentRequestedHandler(ctx: HandlerCtx) {
   const { orderId, amount } = ctx.payload as {

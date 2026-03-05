@@ -75,4 +75,8 @@ export class SynkroService implements OnModuleInit, OnModuleDestroy {
   on(eventType: string, handler: HandlerFunction, retry?: RetryConfig): void {
     this.synkro.on(eventType, handler, retry);
   }
+
+  getInstance(): Synkro {
+    return this.synkro;
+  }
 }

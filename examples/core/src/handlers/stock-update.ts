@@ -1,6 +1,6 @@
 import { HandlerCtx } from "@synkro/core";
 
-import { db } from "../../db";
+import { db } from "../db";
 
 export async function stockUpdateHandler(ctx: HandlerCtx) {
   const { productId, quantity } = ctx.payload as {

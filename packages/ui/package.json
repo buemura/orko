@@ -1,0 +1,44 @@
+{
+  "name": "@synkro/ui",
+  "version": "0.1.0",
+  "description": "Dashboard UI for @synkro/core",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "type-check": "tsc --noEmit"
+  },
+  "keywords": [
+    "workflow",
+    "state-machine",
+    "orchestrator",
+    "event-driven",
+    "dashboard"
+  ],
+  "author": "buemura",
+  "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/buemura/synkro.git"
+  },
+  "homepage": "https://github.com/buemura/synkro/packages/ui#readme",
+  "peerDependencies": {
+    "@synkro/core": "^0.7.0"
+  },
+  "devDependencies": {
+    "@synkro/core": "workspace:*",
+    "@types/node": "^25.3.3",
+    "typescript": "^5.7.0"
+  }
+}

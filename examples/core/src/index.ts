@@ -1,5 +1,6 @@
 import "dotenv/config";
 
+import { createDashboardHandler } from "@synkro/ui";
 import express, { Request, Response } from "express";
 
 import { db } from "./db";
@@ -62,10 +63,13 @@ app.post("/publish", async (req: Request, res: Response) => {
 });
 
 async function bootstrap() {
-  await eventManagerSetup();
+  const synkro = await eventManagerSetup();
+
+  app.use("/synkro", createDashboardHandler(synkro, { basePath: "/synkro" }));
 
   app.listen(PORT, () => {
     console.log(`Server is running on http://localhost:${PORT}`);
+    console.log(`Synkro Dashboard: http://localhost:${PORT}/synkro`);
   });
 }
 

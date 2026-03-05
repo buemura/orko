@@ -1,50 +1,34 @@
-# @synkro/core
+# Synkro
 
-Lightweight workflow and state machine orchestrator. Define event-driven workflows via configuration or code. Supports Redis and in-memory transports.
+Lightweight event-driven workflow orchestrator for Node.js. Define standalone events and multi-step workflows with conditional branching, retries, and chaining — all via simple configuration.
+
+![Dashboard](./packages/ui/docs/dashboard-screenshot.png)
 
 ## Features
 
-- **Standalone Events** — Simple pub/sub event handlers
-- **Sequential Workflows** — Multi-step workflows that execute in order, with state persistence
-- **Conditional Routing** — Branch to different steps based on handler success or failure
+- **Standalone Events** — Simple pub/sub event handlers with optional retries
+- **Sequential Workflows** — Multi-step workflows with automatic state persistence
+- **Conditional Branching** — Route to different steps based on success or failure
 - **Workflow Chaining** — Trigger follow-up workflows on completion, success, or failure
-- **Retry Support** — Configurable retry logic per step
-- **Transport Options** — Redis for production or in-memory for simple projects and local development
-- **Simple API** — Single `Synkro` class with minimal configuration
+- **Retry Support** — Configurable retry logic per event or workflow step
+- **Transport Options** — Redis for production, in-memory for development and testing
+- **Dashboard UI** — Built-in web dashboard to visualize events, workflows, and message metrics
 - **TypeScript** — Full type support out of the box
 
-## Installation
+## Packages
+
+| Package | Description | Version |
+|---|---|---|
+| [@synkro/core](./packages/core) | Core orchestrator with Redis and in-memory transports | 0.7.0 |
+| [@synkro/ui](./packages/ui) | Web dashboard for visualizing events and workflows | 0.1.0 |
+| [@synkro/nestjs](./packages/nestjs) | NestJS integration module | 0.3.0 |
+
+## Quick Start
 
 ```bash
 npm install @synkro/core
 ```
 
-## Quick Start
-
-### In-Memory (no external dependencies)
-
-```ts
-import { Synkro } from "@synkro/core";
-
-const synkro = await Synkro.start({
-  transport: "in-memory",
-  events: [
-    {
-      type: "UserSignedUp",
-      handler: async (ctx) => {
-        console.log("New user:", ctx.payload);
-      },
-    },
-  ],
-});
-
-await synkro.publish("UserSignedUp", { email: "user@example.com" });
-```
-
-### Redis (scalable, multi-instance)
-
-> Requires a running Redis instance.
-
 ```ts
 import { Synkro } from "@synkro/core";
 
@@ -59,24 +43,10 @@ const synkro = await Synkro.start({
       },
     },
   ],
-});
-
-await synkro.publish("UserSignedUp", { email: "user@example.com" });
-```
-
-> The in-memory transport is ideal for simple projects, local development, and testing. For production workloads that require scaling across multiple instances, use Redis.
-
-## Workflows
-
-Define multi-step sequential workflows. Each step runs after the previous one completes, with state automatically persisted.
-
-```ts
-const synkro = await Synkro.start({
-  transport: "redis",
-  connectionUrl: "redis://localhost:6379",
   workflows: [
     {
       name: "ProcessOrder",
+      onSuccess: "StartShipment",
       steps: [
         {
           type: "ValidateStock",
@@ -86,241 +56,59 @@ const synkro = await Synkro.start({
         },
         {
           type: "ProcessPayment",
-          handler: async (ctx) => {
-            console.log("Processing payment...");
-          },
+          handler: paymentHandler,
+          retry: { maxRetries: 3 },
+          onSuccess: "PaymentCompleted",
+          onFailure: "PaymentFailed",
         },
-        {
-          type: "SendConfirmation",
-          handler: async (ctx) => {
-            console.log("Order confirmed!");
-          },
-        },
+        { type: "PaymentCompleted", handler: completedHandler },
+        { type: "PaymentFailed", handler: failedHandler },
+        { type: "SendConfirmation", handler: confirmHandler },
       ],
     },
   ],
 });
 
-// Triggers all 3 steps in sequence
+await synkro.publish("UserSignedUp", { email: "user@example.com" });
 await synkro.publish("ProcessOrder", { orderId: "abc-123", amount: 49.99 });
 ```
 
-### Conditional Routing
+## Dashboard
 
-Use `onSuccess` and `onFailure` on a step to branch to different steps based on the handler outcome. If a handler throws (after all retries), the workflow routes to the `onFailure` step. On success, it routes to the `onSuccess` step.
+Install `@synkro/ui` and mount it on any HTTP endpoint to get a real-time dashboard.
 
-```ts
-{
-  name: "ProcessDocument",
-  steps: [
-    {
-      type: "RunOCR",
-      handler: ocrHandler,
-      retry: { maxRetries: 2 },
-      onSuccess: "ProcessingSucceeded",
-      onFailure: "ProcessingFailed",
-    },
-    {
-      type: "ProcessingSucceeded",
-      handler: async (ctx) => {
-        console.log("OCR completed successfully");
-      },
-    },
-    {
-      type: "ProcessingFailed",
-      handler: async (ctx) => {
-        console.log("OCR failed, notifying support");
-      },
-    },
-  ],
-}
+```bash
+npm install @synkro/ui
 ```
 
-Steps referenced by `onSuccess`/`onFailure` are treated as branch targets. When a branch target completes, the workflow skips over sibling branch targets and advances to the next regular step (if any), or completes.
-
 ```ts
-{
-  name: "ProcessOrder",
-  steps: [
-    {
-      type: "Payment",
-      handler: paymentHandler,
-      onSuccess: "PaymentCompleted",
-      onFailure: "PaymentFailed",
-    },
-    { type: "PaymentCompleted", handler: completedHandler },
-    { type: "PaymentFailed", handler: failedHandler },
-    { type: "SendNotification", handler: notifyHandler }, // runs after either branch
-  ],
-}
+import express from "express";
+import { createDashboardHandler } from "@synkro/ui";
+
+const app = express();
+app.use("/synkro", createDashboardHandler(synkro, { basePath: "/synkro" }));
+app.listen(3000);
+// Dashboard at http://localhost:3000/synkro
 ```
 
-Steps without `onSuccess`/`onFailure` advance sequentially as before.
+### Event Metrics
 
-### Workflow Chaining
+Click any event to see received, completed, and failed message counts (persisted via Redis).
 
-Trigger follow-up workflows when a workflow finishes:
+![Event Detail](./packages/ui/docs/event-detail-screenshot.png)
 
-- **`onSuccess`** — starts a workflow when the current one completes successfully
-- **`onFailure`** — starts a workflow when the current one fails
-- **`onComplete`** — starts a workflow regardless of outcome (runs after `onSuccess`/`onFailure`)
+### Workflow Visualization
 
-```ts
-const workflows = [
-  {
-    name: "ProcessOrder",
-    onSuccess: "StartShipment",
-    onFailure: "HandleError",
-    onComplete: "NotifyCustomer",
-    steps: [
-      { type: "ValidateStock", handler: stockHandler },
-      { type: "ProcessPayment", handler: paymentHandler },
-    ],
-  },
-  {
-    name: "StartShipment",
-    steps: [
-      { type: "ShipOrder", handler: shipHandler },
-    ],
-  },
-  {
-    name: "HandleError",
-    steps: [
-      { type: "LogError", handler: errorHandler },
-    ],
-  },
-  {
-    name: "NotifyCustomer",
-    steps: [
-      { type: "SendEmail", handler: emailHandler },
-    ],
-  },
-];
-```
+Click any workflow to see a branching flow diagram with SVG connectors and a detailed steps table.
 
-Chained workflows inherit the same `requestId` and `payload` from the completed workflow.
+![Workflow Detail](./packages/ui/docs/workflow-detail-screenshot.png)
 
-### Retry
+## Documentation
 
-Configure retries per step. The handler will be retried up to `maxRetries` times before being considered failed.
-
-```ts
-{
-  type: "ProcessPayment",
-  handler: paymentHandler,
-  retry: { maxRetries: 3 },
-}
-```
-
-## API
-
-### `Synkro.start(options): Promise<Synkro>`
-
-Creates and returns a running instance.
-
-```ts
-type SynkroOptions = {
-  transport: "redis" | "in-memory";
-  connectionUrl?: string; // required for external transports (e.g. Redis)
-  debug?: boolean;
-  events?: SynkroEvent[];
-  workflows?: SynkroWorkflow[];
-};
-```
-
-### `synkro.on(eventType, handler, retry?): void`
-
-Registers an event handler at runtime.
-
-```ts
-synkro.on("StockUpdate", async (ctx) => {
-  console.log(ctx.requestId, ctx.payload);
-});
-```
-
-### `synkro.publish(event, payload?, requestId?): Promise<string>`
-
-Publishes an event or starts a workflow. Returns a `requestId` for correlation. A UUID is generated by default, but you can provide your own ID.
-
-```ts
-// Auto-generated UUID
-const id = await synkro.publish("UserSignedUp", { email: "user@example.com" });
-
-// Custom request ID
-const id = await synkro.publish("UserSignedUp", { email: "user@example.com" }, "my-custom-id");
-```
-
-### `ctx.publish(event, payload?, requestId?): Promise<string>`
-
-Publishes an event or starts a workflow from inside a handler. Same signature as `synkro.publish`.
-
-```ts
-synkro.on("OrderCompleted", async (ctx) => {
-  const { orderId } = ctx.payload as { orderId: string };
-  await ctx.publish("SendInvoice", { orderId });
-});
-```
-
-### `ctx.setPayload(data): void`
-
-Merges the given object into `ctx.payload`. The updated payload propagates to subsequent workflow steps and completion/failure events.
-
-```ts
-synkro.on("ValidateStock", async (ctx) => {
-  const available = true;
-  ctx.setPayload({ stockAvailable: available });
-  // ctx.payload is now { ...originalPayload, stockAvailable: true }
-});
-```
-
-### `synkro.stop(): Promise<void>`
-
-Disconnects the transport and cleans up resources.
-
-## Types
-
-```ts
-type RetryConfig = {
-  maxRetries: number;
-};
-
-type SynkroEvent = {
-  type: string;
-  handler: HandlerFunction;
-  retry?: RetryConfig;
-};
-
-type SynkroWorkflow = {
-  name: string;
-  steps: SynkroWorkflowStep[];
-  onComplete?: string;
-  onSuccess?: string;
-  onFailure?: string;
-};
-
-type SynkroWorkflowStep = {
-  type: string;
-  handler: HandlerFunction;
-  retry?: RetryConfig;
-  onSuccess?: string;
-  onFailure?: string;
-};
-
-type HandlerCtx = {
-  requestId: string;
-  payload: unknown;
-  publish: PublishFunction;
-  setPayload: (data: Record<string, unknown>) => void;
-};
-
-type PublishFunction = (
-  event: string,
-  payload?: unknown,
-  requestId?: string,
-) => Promise<string>;
-
-type HandlerFunction = (ctx: HandlerCtx) => void | Promise<void>;
-```
+- **[@synkro/core](./packages/core)** — Full API reference, workflow configuration, conditional routing, chaining, and retry
+- **[@synkro/ui](./packages/ui)** — Dashboard setup, served routes, and configuration options
+- **[@synkro/nestjs](./packages/nestjs)** — NestJS module registration and usage
+- **[Examples](./examples/core)** — Working Express example with events, workflows, and dashboard
 
 ## License
 

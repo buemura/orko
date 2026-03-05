@@ -2,7 +2,7 @@ import { logger } from "./logger.js";
 
 import type { HandlerRegistry } from "./handler-registry.js";
 import type { TransportManager } from "./transport.js";
-import type { SynkroWorkflow } from "./types.js";
+import type { SynkroWorkflow, WorkflowInfo } from "./types.js";
 
 type WorkflowState = {
   workflowName: string;
@@ -22,6 +22,21 @@ export class WorkflowRegistry {
     private redis: TransportManager,
     private handlerRegistry: HandlerRegistry,
   ) {}
+
+  getRegisteredWorkflows(): WorkflowInfo[] {
+    return Array.from(this.workflows.values()).map((w) => ({
+      name: w.name,
+      steps: w.steps.map((s) => ({
+        type: s.type,
+        ...(s.retry && { retry: s.retry }),
+        ...(s.onSuccess && { onSuccess: s.onSuccess }),
+        ...(s.onFailure && { onFailure: s.onFailure }),
+      })),
+      ...(w.onComplete && { onComplete: w.onComplete }),
+      ...(w.onSuccess && { onSuccess: w.onSuccess }),
+      ...(w.onFailure && { onFailure: w.onFailure }),
+    }));
+  }
 
   registerWorkflows(workflows: SynkroWorkflow[]): void {
     for (const workflow of workflows) {

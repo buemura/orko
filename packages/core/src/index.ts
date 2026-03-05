@@ -7,8 +7,10 @@ import { RedisManager } from "./redis.js";
 import { WorkflowRegistry } from "./workflow-registry.js";
 
 import type {
+  EventMetrics,
   HandlerFunction,
   RetryConfig,
+  SynkroIntrospection,
   SynkroOptions,
 } from "./types.js";
 import type { TransportManager } from "./transport.js";
@@ -76,6 +78,17 @@ export class Synkro {
     return requestId;
   }
 
+  async getEventMetrics(eventType: string): Promise<EventMetrics> {
+    return this.handlerRegistry.getEventMetrics(eventType);
+  }
+
+  introspect(): SynkroIntrospection {
+    return {
+      events: this.handlerRegistry.getRegisteredEvents(),
+      workflows: this.workflowRegistry.getRegisteredWorkflows(),
+    };
+  }
+
   async stop(): Promise<void> {
     await this.transport.disconnect();
   }
@@ -83,12 +96,17 @@ export class Synkro {
 
 export type { TransportManager } from "./transport.js";
 export type {
+  EventInfo,
+  EventMetrics,
   HandlerCtx,
   HandlerFunction,
   PublishFunction,
   RetryConfig,
   SynkroEvent,
+  SynkroIntrospection,
   SynkroOptions,
   SynkroWorkflow,
   SynkroWorkflowStep,
+  WorkflowInfo,
+  WorkflowStepInfo,
 } from "./types.js";

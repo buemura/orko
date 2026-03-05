@@ -18,8 +18,9 @@
     "@nestjs/common": "^11.0.0",
     "@nestjs/core": "^11.0.0",
     "@nestjs/platform-express": "^11.0.0",
-    "@synkro/core": "^0.6.0",
-    "@synkro/nestjs": "file:../../packages/nestjs/synkro-nestjs-0.3.0.tgz",
+    "@synkro/core": "workspace:*",
+    "@synkro/nestjs": "workspace:*",
+    "@synkro/ui": "workspace:*",
     "reflect-metadata": "^0.2.0",
     "rxjs": "^7.8.0"
   },
