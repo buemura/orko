@@ -26,9 +26,10 @@ export class SynkroService implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   async onModuleInit(): Promise<void> {
-    const workflows = this.options.workflows
-      ? structuredClone(this.options.workflows)
-      : [];
+    const workflows = (this.options.workflows ?? []).map((w) => ({
+      ...w,
+      steps: w.steps.map((s) => ({ ...s })),
+    }));
 
     // Patch decorated handler functions into workflow step definitions
     const stepHandlers = this.explorer.exploreWorkflowStepHandlers();

@@ -3,16 +3,23 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "build": "tsc",
-    "start": "node dist/main.js",
-    "dev": "tsx watch src/main.ts"
+    "build": "nest build",
+    "start:dev": "nest start --watch",
+    "start": "nest start",
+    "start:debug": "nest start --debug --watch",
+    "start:prod": "node dist/main",
+    "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:cov": "jest --coverage",
+    "test:e2e": "jest --config ./test/jest-e2e.json"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.0",
     "@nestjs/core": "^11.0.0",
     "@nestjs/platform-express": "^11.0.0",
-    "@synkro/core": "file:../../packages/core",
-    "@synkro/nestjs": "file:../../packages/nestjs",
+    "@synkro/core": "^0.5.2",
+    "@synkro/nestjs": "file:../../packages/nestjs/synkro-nestjs-0.1.2.tgz",
     "reflect-metadata": "^0.2.0",
     "rxjs": "^7.8.0"
   },
