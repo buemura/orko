@@ -13,4 +13,12 @@ export async function stockUpdateHandler(ctx: HandlerCtx) {
   await new Promise((resolve) => setTimeout(resolve, 2000));
 
   db.updateProductStock(productId, quantity);
+
+  ctx.setPayload({
+    productId,
+    quantity,
+    appendedData: "Stock update successful",
+  });
+
+  await ctx.publish("IndependentEvent", { productId, quantity });
 }

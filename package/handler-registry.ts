@@ -1,7 +1,12 @@
 import { logger } from "./logger.js";
 
 import type { RedisManager } from "./redis.js";
-import type { HandlerCtx, HandlerFunction, RetryConfig } from "./types.js";
+import type {
+  HandlerCtx,
+  HandlerFunction,
+  PublishFunction,
+  RetryConfig,
+} from "./types.js";
 
 type HandlerEntry = {
   handler: HandlerFunction;
@@ -11,7 +16,13 @@ type HandlerEntry = {
 export class HandlerRegistry {
   private handlers = new Map<string, HandlerEntry>();
 
+  private publishFn: PublishFunction | null = null;
+
   constructor(private redis: RedisManager) {}
+
+  setPublishFn(fn: PublishFunction): void {
+    this.publishFn = fn;
+  }
 
   register(
     eventType: string,
@@ -37,21 +48,30 @@ export class HandlerRegistry {
       return;
     }
 
-    const event = JSON.parse(message) as HandlerCtx;
+    const event = JSON.parse(message) as { requestId: string; payload: unknown };
     const maxRetries = entry.retry?.maxRetries ?? 0;
+
+    const ctx: HandlerCtx = {
+      requestId: event.requestId,
+      payload: event.payload,
+      publish: this.publishFn!,
+      setPayload(data: Record<string, unknown>) {
+        ctx.payload =
+          typeof ctx.payload === "object" && ctx.payload !== null
+            ? { ...ctx.payload, ...data }
+            : data;
+      },
+    };
 
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
-        await entry.handler({
-          requestId: event.requestId,
-          payload: event.payload,
-        });
+        await entry.handler(ctx);
 
         this.redis.publishMessage(
           `event:${eventType}:completed`,
           JSON.stringify({
-            requestId: event.requestId,
-            payload: event.payload,
+            requestId: ctx.requestId,
+            payload: ctx.payload,
           }),
         );
         return;
@@ -68,8 +88,8 @@ export class HandlerRegistry {
           this.redis.publishMessage(
             `event:${eventType}:failed`,
             JSON.stringify({
-              requestId: event.requestId,
-              payload: event.payload,
+              requestId: ctx.requestId,
+              payload: ctx.payload,
             }),
           );
         }

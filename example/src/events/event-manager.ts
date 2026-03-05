@@ -34,6 +34,18 @@ const events: SynkroEvent[] = [
     },
     retry: { maxRetries: 2 },
   },
+  {
+    type: "IndependentEvent",
+    handler: async ({ requestId, payload }) => {
+      console.log(
+        `[Event Handler] - Handling IndependentEvent for request ${requestId}`,
+      );
+
+      // Simulate some processing logic
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    },
+    retry: { maxRetries: 2 },
+  },
 ];
 
 const workflows: SynkroWorkflow[] = [

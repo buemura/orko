@@ -20,6 +20,7 @@ export class Synkro {
     this.redis = redis;
     this.handlerRegistry = new HandlerRegistry(redis);
     this.workflowRegistry = new WorkflowRegistry(redis, this.handlerRegistry);
+    this.handlerRegistry.setPublishFn(this.publish.bind(this));
   }
 
   static async start(options: SynkroOptions): Promise<Synkro> {
@@ -71,6 +72,7 @@ export class Synkro {
 export type {
   HandlerCtx,
   HandlerFunction,
+  PublishFunction,
   RetryConfig,
   SynkroEvent,
   SynkroOptions,

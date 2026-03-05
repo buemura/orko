@@ -31,9 +31,17 @@ export type SynkroOptions = {
   workflows?: SynkroWorkflow[];
 };
 
+export type PublishFunction = (
+  event: string,
+  payload?: unknown,
+  requestId?: string,
+) => Promise<string>;
+
 export type HandlerCtx = {
   requestId: string;
   payload: unknown;
+  publish: PublishFunction;
+  setPayload: (data: Record<string, unknown>) => void;
 };
 
 export type HandlerFunction = (ctx: HandlerCtx) => void | Promise<void>;

@@ -222,6 +222,29 @@ const id = await synkro.publish("UserSignedUp", { email: "user@example.com" });
 const id = await synkro.publish("UserSignedUp", { email: "user@example.com" }, "my-custom-id");
 ```
 
+### `ctx.publish(event, payload?, requestId?): Promise<string>`
+
+Publishes an event or starts a workflow from inside a handler. Same signature as `synkro.publish`.
+
+```ts
+synkro.on("OrderCompleted", async (ctx) => {
+  const { orderId } = ctx.payload as { orderId: string };
+  await ctx.publish("SendInvoice", { orderId });
+});
+```
+
+### `ctx.setPayload(data): void`
+
+Merges the given object into `ctx.payload`. The updated payload propagates to subsequent workflow steps and completion/failure events.
+
+```ts
+synkro.on("ValidateStock", async (ctx) => {
+  const available = true;
+  ctx.setPayload({ stockAvailable: available });
+  // ctx.payload is now { ...originalPayload, stockAvailable: true }
+});
+```
+
 ### `synkro.stop(): Promise<void>`
 
 Disconnects all Redis clients.
@@ -258,7 +281,15 @@ type SynkroWorkflowStep = {
 type HandlerCtx = {
   requestId: string;
   payload: unknown;
+  publish: PublishFunction;
+  setPayload: (data: Record<string, unknown>) => void;
 };
+
+type PublishFunction = (
+  event: string,
+  payload?: unknown,
+  requestId?: string,
+) => Promise<string>;
 
 type HandlerFunction = (ctx: HandlerCtx) => void | Promise<void>;
 ```
