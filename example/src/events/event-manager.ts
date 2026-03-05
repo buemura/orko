@@ -17,6 +17,7 @@ const events: SynkroEvent[] = [
       // Simulate some processing logic
       await new Promise((resolve) => setTimeout(resolve, 100));
     },
+    retry: { maxRetries: 3 },
   },
   {
     type: EventTypes.StockUpdate,
@@ -24,9 +25,12 @@ const events: SynkroEvent[] = [
       console.log(
         `[Event Handler] - Handling StockUpdate for request ${requestId}`,
       );
+
+      throw new Error("Simulated failure in StockUpdate handler");
       // Simulate some processing logic
       await new Promise((resolve) => setTimeout(resolve, 100));
     },
+    retry: { maxRetries: 2 },
   },
 ];
 
@@ -37,6 +41,7 @@ const workflows: SynkroWorkflow[] = [
       {
         type: EventTypes.StockUpdate,
         handler: stockUpdateHandler,
+        retry: { maxRetries: 3 },
       },
       {
         type: EventTypes.PaymentRequested,
@@ -54,7 +59,8 @@ export async function eventManagerSetup(): Promise<Synkro> {
   if (synkro) return synkro;
 
   synkro = await Synkro.start({
-    redisUrl: process.env.REDIS_URL || "redis://localhost:6379",
+    redisUrl: process.env.REDIS_URL! || "redis://localhost:6379",
+    debug: true,
     events,
     workflows,
   });

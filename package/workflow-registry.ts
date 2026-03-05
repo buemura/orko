@@ -36,7 +36,7 @@ export class WorkflowRegistry {
         this.eventToWorkflows.get(key)!.push({ workflow, stepIndex: i });
 
         const channel = this.stepChannel(workflow.name, step.type);
-        this.handlerRegistry.register(channel, step.handler);
+        this.handlerRegistry.register(channel, step.handler, step.retry);
       }
 
       this.subscribeToWorkflowEvents(workflow);

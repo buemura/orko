@@ -1,11 +1,17 @@
+export type RetryConfig = {
+  maxRetries: number;
+};
+
 export type SynkroEvent = {
   type: string;
   handler: HandlerFunction;
+  retry?: RetryConfig;
 };
 
 export type SynkroWorkflowStep = {
   type: string;
   handler: HandlerFunction;
+  retry?: RetryConfig;
 };
 
 export type SynkroWorkflow = {

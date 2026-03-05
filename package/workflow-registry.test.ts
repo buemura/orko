@@ -57,14 +57,17 @@ describe("WorkflowRegistry", () => {
       expect(mockHandlerRegistry.register).toHaveBeenCalledWith(
         "workflow:order-processing:validate",
         workflow.steps[0]!.handler,
+        undefined,
       );
       expect(mockHandlerRegistry.register).toHaveBeenCalledWith(
         "workflow:order-processing:charge",
         workflow.steps[1]!.handler,
+        undefined,
       );
       expect(mockHandlerRegistry.register).toHaveBeenCalledWith(
         "workflow:order-processing:ship",
         workflow.steps[2]!.handler,
+        undefined,
       );
     });
 

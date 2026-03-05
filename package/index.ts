@@ -5,7 +5,11 @@ import { setDebug } from "./logger.js";
 import { RedisManager } from "./redis.js";
 import { WorkflowRegistry } from "./workflow-registry.js";
 
-import type { HandlerFunction, SynkroOptions } from "./types.js";
+import type {
+  HandlerFunction,
+  RetryConfig,
+  SynkroOptions,
+} from "./types.js";
 
 export class Synkro {
   private redis: RedisManager;
@@ -25,7 +29,7 @@ export class Synkro {
 
     if (options.events) {
       for (const event of options.events) {
-        instance.on(event.type, event.handler);
+        instance.on(event.type, event.handler, event.retry);
       }
     }
 
@@ -36,8 +40,8 @@ export class Synkro {
     return instance;
   }
 
-  on(eventType: string, handler: HandlerFunction): void {
-    this.handlerRegistry.register(eventType, handler);
+  on(eventType: string, handler: HandlerFunction, retry?: RetryConfig): void {
+    this.handlerRegistry.register(eventType, handler, retry);
   }
 
   async publish(
@@ -67,6 +71,7 @@ export class Synkro {
 export type {
   HandlerCtx,
   HandlerFunction,
+  RetryConfig,
   SynkroEvent,
   SynkroOptions,
   SynkroWorkflow,
