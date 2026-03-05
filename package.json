@@ -29,8 +29,13 @@
     "event-driven",
     "redis"
   ],
-  "author": "",
+  "author": "buemura",
   "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/buemura/synkro.git"
+  },
+  "homepage": "https://github.com/buemura/synkro#readme",
   "type": "module",
   "dependencies": {
     "ioredis": "^5.10.0"
