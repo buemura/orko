@@ -19,8 +19,6 @@ class TestEventHandler {
   }
 }
 
-const noop = async () => {};
-
 @Injectable()
 class TestWorkflowHandler {
   stockFn = vi.fn();
@@ -152,8 +150,8 @@ describe("SynkroModule", () => {
               {
                 name: "TestWorkflow",
                 steps: [
-                  { type: "StockCheck", handler: noop },
-                  { type: "Payment", handler: noop },
+                  { type: "StockCheck" },
+                  { type: "Payment" },
                 ],
               },
             ],

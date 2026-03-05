@@ -26,9 +26,10 @@ export class SynkroService implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   async onModuleInit(): Promise<void> {
+    const noop = async () => {};
     const workflows = (this.options.workflows ?? []).map((w) => ({
       ...w,
-      steps: w.steps.map((s) => ({ ...s })),
+      steps: w.steps.map((s) => ({ ...s, handler: s.handler ?? noop })),
     }));
 
     // Patch decorated handler functions into workflow step definitions

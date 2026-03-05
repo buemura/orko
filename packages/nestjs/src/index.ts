@@ -9,4 +9,6 @@ export type {
 export type {
   SynkroModuleOptions,
   SynkroModuleAsyncOptions,
+  NestSynkroWorkflow,
+  NestSynkroWorkflowStep,
 } from "./synkro.interfaces.js";
