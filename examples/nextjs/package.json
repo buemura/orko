@@ -9,7 +9,7 @@
   },
   "dependencies": {
     "@orko/core": "workspace:*",
-    "@orko/nextjs": "workspace:*",
+    "@orko/next": "workspace:*",
     "@orko/ui": "workspace:*",
     "next": "^16.0.0",
     "react": "^19.0.0",

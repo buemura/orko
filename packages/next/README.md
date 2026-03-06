@@ -1,11 +1,11 @@
-# @orko/nextjs
+# @orko/next
 
 Next.js integration for [@orko/core](https://www.npmjs.com/package/@orko/core).
 
 ## Installation
 
 ```bash
-npm install @orko/nextjs @orko/core @orko/ui
+npm install @orko/next @orko/core @orko/ui
 ```
 
 ## Quick Start
@@ -14,7 +14,7 @@ npm install @orko/nextjs @orko/core @orko/ui
 
 ```typescript
 // lib/orko.ts
-import { createOrko, createDashboardHandler } from "@orko/nextjs";
+import { createOrko, createDashboardHandler } from "@orko/next";
 
 export const orko = createOrko({
   transport: "redis",
@@ -32,7 +32,11 @@ export const orko = createOrko({
       name: "ProcessOrder",
       steps: [
         { type: "ValidateOrder", handler: validateOrderHandler },
-        { type: "ProcessPayment", handler: processPaymentHandler, retry: { maxRetries: 3 } },
+        {
+          type: "ProcessPayment",
+          handler: processPaymentHandler,
+          retry: { maxRetries: 3 },
+        },
         { type: "ConfirmOrder", handler: confirmOrderHandler },
       ],
     },
@@ -76,7 +80,10 @@ The dashboard is now available at `/orko`.
 // handlers/validate-order.handler.ts
 import type { HandlerCtx } from "@orko/core";
 
-export const validateOrderHandler = async ({ requestId, payload }: HandlerCtx) => {
+export const validateOrderHandler = async ({
+  requestId,
+  payload,
+}: HandlerCtx) => {
   console.log(`Validating order ${requestId}...`, payload);
 };
 ```
@@ -89,22 +96,22 @@ Creates a lazy-initializing orko client. Accepts the same options as `Orko.start
 
 Returns a `OrkoClient` with the following methods:
 
-| Method | Description |
-|---|---|
-| `publish(event, payload?, requestId?)` | Publish an event or start a workflow |
-| `on(eventType, handler, retry?)` | Register an event handler at runtime |
-| `introspect()` | Get metadata about registered events and workflows |
-| `getEventMetrics(eventType)` | Get received/completed/failed counts for an event |
-| `getInstance()` | Get the underlying `Orko` instance |
-| `stop()` | Disconnect and clean up |
+| Method                                 | Description                                        |
+| -------------------------------------- | -------------------------------------------------- |
+| `publish(event, payload?, requestId?)` | Publish an event or start a workflow               |
+| `on(eventType, handler, retry?)`       | Register an event handler at runtime               |
+| `introspect()`                         | Get metadata about registered events and workflows |
+| `getEventMetrics(eventType)`           | Get received/completed/failed counts for an event  |
+| `getInstance()`                        | Get the underlying `Orko` instance                 |
+| `stop()`                               | Disconnect and clean up                            |
 
 ### `createDashboardHandler(orko, options?)`
 
 Creates a Next.js route handler for the `@orko/ui` dashboard.
 
-| Option | Type | Default | Description |
-|---|---|---|---|
-| `basePath` | `string` | `"/"` | URL path prefix where the dashboard is mounted |
+| Option     | Type     | Default | Description                                    |
+| ---------- | -------- | ------- | ---------------------------------------------- |
+| `basePath` | `string` | `"/"`   | URL path prefix where the dashboard is mounted |
 
 ## Next.js Configuration
 

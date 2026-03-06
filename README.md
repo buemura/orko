@@ -22,7 +22,7 @@ Lightweight event-driven workflow orchestrator for Node.js. Define standalone ev
 | [@orko/core](./packages/core)     | Core orchestrator with Redis and in-memory transports | 0.1.0   |
 | [@orko/ui](./packages/ui)         | Web dashboard for visualizing events and workflows    | 0.1.0   |
 | [@orko/nestjs](./packages/nestjs) | NestJS integration module                             | 0.1.0   |
-| [@orko/nextjs](./packages/nextjs) | Next.js integration                                   | 0.1.0   |
+| [@orko/next](./packages/nextjs)   | Next.js integration                                   | 0.1.0   |
 
 ## Quick Start
 
@@ -109,7 +109,7 @@ Click any workflow to see a branching flow diagram with SVG connectors and a det
 - **[@orko/core](./packages/core)** — Full API reference, workflow configuration, conditional routing, chaining, and retry
 - **[@orko/ui](./packages/ui)** — Dashboard setup, served routes, and configuration options
 - **[@orko/nestjs](./packages/nestjs)** — NestJS module registration and usage
-- **[@orko/nextjs](./packages/nextjs)** — Next.js integration with route handlers and dashboard
+- **[@orko/next](./packages/nextjs)** — Next.js integration with route handlers and dashboard
 - **[Examples](./examples)** — Working examples with Express, NestJS, and Next.js
 
 ## License

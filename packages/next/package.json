@@ -1,5 +1,5 @@
 {
-  "name": "@orko/nextjs",
+  "name": "@orko/next",
   "version": "0.1.0",
   "description": "Next.js integration for @orko/core",
   "main": "dist/index.js",
@@ -38,7 +38,7 @@
   "homepage": "https://github.com/buemura/orko/packages/next#readme",
   "peerDependencies": {
     "@orko/core": "^0.1.0",
-    "@orko/ui": "^0.1.0",
+    "@orko/ui": "^0.1.1",
     "next": "^14.0.0 || ^15.0.0 || ^16.0.0"
   },
   "devDependencies": {

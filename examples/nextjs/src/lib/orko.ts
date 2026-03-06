@@ -1,4 +1,4 @@
-import { createDashboardHandler, createOrko } from "@orko/nextjs";
+import { createDashboardHandler, createOrko } from "@orko/next";
 
 import { confirmOrderHandler } from "@/handlers/confirm-order.handler";
 import { orderCreatedHandler } from "@/handlers/order-created.handler";
