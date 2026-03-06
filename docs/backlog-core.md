@@ -1,0 +1,150 @@
+# @synkro/core - Backlog
+
+Items are organized by priority (P0 > P1 > P2 > P3). Security-sensitive items are tagged with `[SEC]`.
+
+---
+
+## P0 - Critical
+
+### TD-11: Validate workflow definitions at registration
+**File:** `packages/core/src/workflows/workflow-registry.ts`
+Workflows are accepted without structural validation (empty `steps`, duplicate step types, dangling `onSuccess`/`onFailure` targets). Non-null assertion on `workflow.steps[0]!` can crash at runtime. Should add a workflow validator that throws clear errors before subscription/registration.
+
+### TD-13: Harden message parsing paths `[SEC]`
+**File:** `packages/core/src/handlers/handler-registry.ts`, `packages/core/src/workflows/workflow-registry.ts`
+Multiple `JSON.parse` calls assume valid message payloads. A malformed message can throw and destabilize processing paths. Should wrap with safe decode, structured logging, and drop/redirect invalid messages. **Security note:** Unvalidated parsing of external input is a vector for denial-of-service and injection if payloads reach downstream logic unsanitized.
+
+### IMP-07: Redis connection error handling
+**File:** `packages/core/src/transport/redis.ts:13-16`
+`RedisManager` creates three Redis connections in the constructor with no error handling. If the connection fails, errors surface as unhandled rejections. Should add connection retry logic and expose connection status.
+
+---
+
+## P1 - High
+
+### TD-01: No retry backoff strategy
+**File:** `packages/core/src/handlers/handler-registry.ts:105-142`
+Retries execute immediately with no delay between attempts, causing thundering-herd behavior under failure conditions. Should support exponential backoff, fixed delay, jitter, and predicate-based retryable error policy in `RetryConfig`.
+
+### TD-04: Publish is fire-and-forget with no error handling
+**File:** `packages/core/src/transport/redis.ts:26-28`, `packages/core/src/transport/transport.ts`
+`RedisManager.publishMessage` calls `this.publisher.publish()` without awaiting. The `TransportManager` interface declares it as `void`, not `Promise<void>`, so errors during publish are silently swallowed. Should make publish async and propagate or record failures.
+
+### TD-08: `SynkroOptions.transport` field inconsistency `[SEC]`
+**File:** `packages/core/src/types.ts:28`, `packages/core/src/synkro.ts:34`
+`transport` is typed as `"redis" | "in-memory"` but `Synkro.start` defaults to Redis when the value is anything other than `"in-memory"`. No validation for invalid values. **Security note:** Silent fallback to a networked transport (Redis) when an invalid value is passed could unintentionally expose events to a shared bus.
+
+### TD-10: No `unsubscribe` / `off` capability
+No way to unregister an event handler or unsubscribe from a channel at runtime. Re-registering the same event calls subscribe again with no dedup. Should track per-event subscription once and provide explicit `off()` / `replace` semantics.
+
+### TD-05: `processingLocks` grow unbounded in `WorkflowRegistry`
+**File:** `packages/core/src/workflows/workflow-registry.ts:20`
+`processingLocks` is a `Set<string>` that only deletes entries in `finally` blocks. The `locks` Map (line 21) may accumulate promise entries during high-concurrency scenarios since cleanup depends on timing.
+
+### TD-06: Global mutable logger state
+**File:** `packages/core/src/logger.ts:1`
+`debugEnabled` is a module-level mutable boolean. If multiple `Synkro` instances are created with different `debug` settings, the last one wins globally. Logger should be scoped per instance.
+
+### TD-07: Hardcoded workflow state TTL
+**File:** `packages/core/src/workflows/workflow-registry.ts:378`
+Workflow state TTL is hardcoded to `86400` seconds (24h). Long-running workflows may lose state. Should be configurable per workflow.
+
+### FT-01: Dead letter queue for failed events
+**Starting points:** `packages/core/src/handlers/handler-registry.ts`, `packages/core/src/workflows/workflow-registry.ts`
+Failed events (after retry exhaustion) are only published to a `event:{type}:failed` channel. There's no persistent dead letter queue for later inspection or replay. Enables operational recovery and observability.
+
+### FT-02: Scheduled and delayed event publishing
+**Starting points:** `packages/core/src/synkro.ts`, `packages/core/src/types.ts`, transport interfaces
+Support publishing events on a schedule or with a delay (e.g., `synkro.schedule("cleanup:run", "0 */6 * * *")` or `synkro.publishDelayed(event, payload, delay)`). Needed for retries, timeouts, reminders, and saga-style workflows.
+
+### FT-03: Idempotency and deduplication support `[SEC]`
+**Starting points:** `packages/core/src/handlers/handler-registry.ts`, workflow state/cache design
+Prevents duplicate side effects in distributed/multi-instance scenarios. Current locks are in-process memory only (`processingLocks`), not cross-instance. **Security note:** Lack of cross-instance dedup can lead to repeated financial transactions, duplicate notifications, or replay attacks.
+
+### FT-06: Workflow timeout
+No timeout mechanism for workflows or individual steps. A step that hangs will leave the workflow in `running` state forever. Add `timeout` to `SynkroWorkflowStep` and `SynkroWorkflow`.
+
+### IMP-04: Event schema validation `[SEC]`
+No validation on event payloads at publish or subscribe time. Integrating a schema registry (e.g., Zod schemas per event type) would catch malformed payloads early. **Security note:** Unvalidated payloads can carry injection vectors through the system if handlers pass data to databases, templates, or shell commands.
+
+### IMP-06: Graceful shutdown
+`stop()` disconnects Redis but doesn't wait for in-flight handlers to complete. Should drain active handlers before disconnecting to prevent data loss.
+
+### IMP-02: Error object in failure events
+When a handler fails, the error object is logged but not included in the failure event payload published to Redis. Downstream listeners (workflow failure handlers, monitoring) have no visibility into what went wrong.
+
+---
+
+## P2 - Medium
+
+### TD-03: In-memory transport ignores TTL
+**File:** `packages/core/src/transport/in-memory.ts:39`
+`setCache` accepts `_ttlSeconds` but never uses it. Cached entries persist forever in memory, making in-memory behavior diverge from Redis and hiding bugs during development.
+
+### TD-09: `eslint-disable` for decorator types
+**File:** `packages/core/src/handlers/decorators.ts:17-18`
+Both decorators use `@typescript-eslint/no-unsafe-function-type` disable comments. Could use more precise typings with `(...args: any[]) => any` or proper method decorator signatures.
+
+### TD-12: Dead code - `eventToWorkflows` map
+**File:** `packages/core/src/workflows/workflow-registry.ts`
+`eventToWorkflows` map is populated but never read. Remove it or implement a concrete use (query/index API).
+
+### IMP-01: Typed payload generics
+**File:** `packages/core/src/types.ts`, `packages/core/src/synkro.ts`
+`HandlerCtx.payload` is typed as `unknown`, forcing every handler to cast. Introduce `HandlerCtx<T>` generics so handlers get typed payloads and `publish<T>(event, payload)` provides compile-time safety. Extend to decorator metadata typing.
+
+### IMP-05: Structured logging
+Logger only supports `console.log`/`warn`/`error` with unstructured args. Should support structured JSON output with fields like `requestId`, `eventType`, `workflowName` for production observability.
+
+### IMP-08: Metrics/state retention controls
+**File:** `packages/core/src/handlers/handler-registry.ts`
+Event metrics keys (`synkro:metrics:...`) are monotonic with no TTL/reset policy, leading to unbounded key growth. Should add optional metrics TTL/reset hooks and retention config.
+
+### IMP-09: Test coverage for transports
+No dedicated test file for `in-memory.ts`. Most behavior tests use Redis mocks; in-memory transport parity is not verified. Should add shared transport contract tests executed against both implementations, covering TTL behavior, concurrent subscriptions, and edge cases.
+
+### FT-04: Workflow state query API
+**Starting points:** `packages/core/src/workflows/workflow-registry.ts`, `Synkro` public API
+No way to query the current state of a running workflow from outside. `WorkflowRegistry` has `getState` but it's private. Expose `synkro.getWorkflowState(requestId, workflowName)` for external inspection.
+
+### FT-07: Workflow cancellation
+No way to cancel a running workflow. Should support `synkro.cancelWorkflow(requestId, workflowName)` that sets state to `cancelled` and stops step progression.
+
+### FT-09: Event filtering / conditional handlers
+Allow handlers to specify a filter predicate so they only execute when the payload matches certain conditions, reducing unnecessary handler invocations.
+
+### FT-12: Event versioning
+No event versioning support. When event payload schemas evolve, there's no way to handle v1 vs v2 of the same event. Support event type versioning (e.g., `user:created:v2`).
+
+---
+
+## P3 - Low / Nice-to-have
+
+### IMP-03: Middleware / interceptor pipeline
+No way to add cross-cutting concerns (logging, tracing, auth, validation) without modifying each handler. A middleware chain on `HandlerRegistry` (e.g., `synkro.use(middleware)`) would be valuable.
+
+### FT-05: Parallel workflow steps
+Currently workflows are strictly sequential (with branching). Support parallel step execution where multiple steps run concurrently and the workflow advances when all (or any) complete. E.g., `parallel: ["step-a", "step-b"]`.
+
+### FT-08: Event replay / history
+No event history or replay capability. Add an optional event store that records all published events with timestamps, enabling replay for debugging or recovery.
+
+### FT-10: Workflow visualization / DAG export
+Expose workflow definitions as a DAG structure (e.g., DOT format or JSON graph) for visualization in the UI dashboard. `introspect()` returns flat data but doesn't capture the branching graph.
+
+### FT-11: Multiple transport support (NATS, Kafka, RabbitMQ)
+The `TransportManager` interface is clean enough to support other message brokers. Adding NATS or Kafka transports would broaden adoption.
+
+### FT-13: Workflow sub-workflows / composition
+Support nesting workflows as steps within other workflows, enabling reusable workflow components. Currently chaining via `onSuccess`/`onFailure`/`onComplete` is flat.
+
+---
+
+## Security Summary
+
+| Item | Risk | Description |
+|------|------|-------------|
+| TD-13 | High | Unvalidated `JSON.parse` on external input - DoS / injection vector |
+| IMP-04 | High | No payload schema validation - injection can propagate through handlers |
+| FT-03 | Medium | No cross-instance dedup - replay attacks / duplicate side effects |
+| TD-08 | Medium | Silent fallback to Redis transport - unintended event exposure |
