@@ -1,382 +1,114 @@
 export function getDashboardHtml(): string {
   return `<!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Orko Dashboard</title>
+  <script>
+    (function() {
+      var t = localStorage.getItem('orko-theme');
+      if (t === 'light') document.documentElement.classList.remove('dark');
+    })();
+  </script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            bg: 'var(--color-bg)',
+            surface: { DEFAULT: 'var(--color-surface)', hover: 'var(--color-surface-hover)' },
+            border: 'var(--color-border)',
+            txt: { DEFAULT: 'var(--color-txt)', muted: 'var(--color-txt-muted)' },
+            accent: { DEFAULT: '#7c6af6', dim: 'var(--color-accent-dim)' },
+            success: { DEFAULT: '#34d399', dim: 'var(--color-success-dim)' },
+            danger: { DEFAULT: '#f87171', dim: 'var(--color-danger-dim)' },
+            warning: { DEFAULT: '#fbbf24', dim: 'var(--color-warning-dim)' },
+          },
+          borderRadius: { DEFAULT: '10px' },
+          fontFamily: { mono: ["'SF Mono'", "'Fira Code'", "monospace"] },
+        }
+      }
+    }
+  </script>
   <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
     :root {
-      --bg: #0a0a0f;
-      --surface: #12121a;
-      --surface-hover: #1a1a25;
-      --border: #1e1e2e;
-      --text: #e2e2e8;
-      --text-muted: #6e6e82;
-      --accent: #7c6af6;
-      --accent-dim: #7c6af620;
-      --success: #34d399;
-      --success-dim: #34d39920;
-      --danger: #f87171;
-      --danger-dim: #f8717120;
-      --warning: #fbbf24;
-      --warning-dim: #fbbf2420;
-      --radius: 10px;
+      --color-bg: #f5f5f8;
+      --color-surface: #ffffff;
+      --color-surface-hover: #f0f0f5;
+      --color-border: #e0e0ea;
+      --color-txt: #1a1a2e;
+      --color-txt-muted: #6e6e82;
+      --color-accent-dim: rgba(124,106,246,0.1);
+      --color-success-dim: rgba(52,211,153,0.1);
+      --color-danger-dim: rgba(248,113,113,0.1);
+      --color-warning-dim: rgba(251,191,36,0.1);
+      --color-seq: #6e6e82;
+    }
+    .dark {
+      --color-bg: #0a0a0f;
+      --color-surface: #12121a;
+      --color-surface-hover: #1a1a25;
+      --color-border: #1e1e2e;
+      --color-txt: #e2e2e8;
+      --color-txt-muted: #6e6e82;
+      --color-accent-dim: rgba(124,106,246,0.13);
+      --color-success-dim: rgba(52,211,153,0.13);
+      --color-danger-dim: rgba(248,113,113,0.13);
+      --color-warning-dim: rgba(251,191,36,0.13);
+      --color-seq: #6e6e82;
     }
 
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      line-height: 1.5;
-      min-height: 100vh;
-    }
-
-    .container {
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 32px 24px;
-    }
-
-    header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 40px;
-    }
-
-    .logo {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-
-    .logo-icon {
-      width: 36px;
-      height: 36px;
-      background: var(--accent);
-      border-radius: 8px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: 700;
-      font-size: 16px;
-      color: #fff;
-    }
-
-    .logo h1 {
-      font-size: 22px;
-      font-weight: 600;
-      letter-spacing: -0.5px;
-    }
-
-    .logo h1 span { color: var(--text-muted); font-weight: 400; font-size: 14px; margin-left: 8px; }
-
-    .btn {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      color: var(--text);
-      padding: 8px 16px;
-      border-radius: 8px;
-      cursor: pointer;
-      font-size: 13px;
-      transition: background 0.15s;
-      text-decoration: none;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .btn:hover { background: var(--surface-hover); }
-
-    .stats {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 16px;
-      margin-bottom: 40px;
-    }
-
-    .stat-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 20px;
-    }
-
-    .stat-card .label { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
-    .stat-card .value { font-size: 32px; font-weight: 700; margin-top: 4px; }
-    .stat-card.accent .value { color: var(--accent); }
-    .stat-card.success .value { color: var(--success); }
-    .stat-card.danger .value { color: var(--danger); }
-
-    .section { margin-bottom: 40px; }
-
-    .section-header {
-      font-size: 16px;
-      font-weight: 600;
-      margin-bottom: 16px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .section-header .count {
-      background: var(--accent-dim);
-      color: var(--accent);
-      font-size: 12px;
-      padding: 2px 8px;
-      border-radius: 99px;
-      font-weight: 500;
-    }
-
-    /* Events Table */
-    .events-table {
-      width: 100%;
-      border-collapse: collapse;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      overflow: hidden;
-    }
-
-    .events-table th {
-      text-align: left;
-      padding: 12px 16px;
-      font-size: 11px;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      color: var(--text-muted);
-      border-bottom: 1px solid var(--border);
-      background: var(--surface);
-    }
-
-    .events-table td {
-      padding: 12px 16px;
-      border-bottom: 1px solid var(--border);
-      font-size: 14px;
-    }
-
+    /* Minimal styles that are hard to express in Tailwind */
+    .events-table { border-collapse: collapse; }
+    .events-table th, .events-table td { text-align: left; }
     .events-table tr:last-child td { border-bottom: none; }
-    .events-table tr.clickable { cursor: pointer; transition: background 0.15s; }
-    .events-table tr.clickable:hover { background: var(--surface-hover); }
-
-    .event-type {
-      font-family: 'SF Mono', 'Fira Code', monospace;
-      font-size: 13px;
-      color: var(--accent);
-    }
-
-    .badge {
-      display: inline-block;
-      font-size: 11px;
-      padding: 2px 8px;
-      border-radius: 99px;
-      font-weight: 500;
-    }
-
-    .badge-retry {
-      background: var(--warning-dim);
-      color: var(--warning);
-    }
-
-    .badge-none {
-      background: var(--border);
-      color: var(--text-muted);
-    }
-
-    /* Workflow Cards */
-    .workflow-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 24px;
-      margin-bottom: 16px;
-    }
-
-    .workflow-name {
-      font-family: 'SF Mono', 'Fira Code', monospace;
-      font-size: 15px;
-      font-weight: 600;
-      margin-bottom: 20px;
-      color: var(--accent);
-    }
-
-    .workflow-callbacks {
-      display: flex;
-      gap: 12px;
-      margin-top: 16px;
-      padding-top: 16px;
-      border-top: 1px solid var(--border);
-      flex-wrap: wrap;
-    }
-
-    .callback-tag {
-      font-size: 12px;
-      padding: 4px 10px;
-      border-radius: 6px;
-      font-family: 'SF Mono', 'Fira Code', monospace;
-    }
-
-    .callback-complete { background: var(--accent-dim); color: var(--accent); }
-    .callback-success { background: var(--success-dim); color: var(--success); }
-    .callback-failure { background: var(--danger-dim); color: var(--danger); }
-
-    /* Workflow Flow Diagram */
-    .workflow-flow {
-      position: relative;
-      overflow-x: auto;
-      padding: 8px 0;
-    }
-
-    .workflow-flow svg {
-      position: absolute;
-      top: 0;
-      left: 0;
-      pointer-events: none;
-    }
-
-    .flow-grid {
-      display: grid;
-      grid-auto-flow: column;
-      grid-template-rows: auto auto auto;
-      gap: 16px 40px;
-      align-items: center;
-      position: relative;
-    }
-
-    .flow-node {
-      background: var(--bg);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 12px 16px;
-      min-width: 140px;
-      text-align: center;
-    }
-
-    .flow-node.branch-success { border-color: var(--success); border-width: 1px; }
-    .flow-node.branch-failure { border-color: var(--danger); border-width: 1px; }
-
-    .flow-node .node-type {
-      font-family: 'SF Mono', 'Fira Code', monospace;
-      font-size: 12px;
-      font-weight: 500;
-    }
-
-    .flow-node .node-label {
-      font-size: 10px;
-      margin-top: 4px;
-    }
-
-    .flow-node .node-label.label-success { color: var(--success); }
-    .flow-node .node-label.label-failure { color: var(--danger); }
-
-    .flow-spacer {
-      visibility: hidden;
-      min-width: 140px;
-      padding: 12px 16px;
-    }
-
-    .empty-state {
-      text-align: center;
-      padding: 48px;
-      color: var(--text-muted);
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-    }
-
-    .empty-state p { font-size: 14px; }
-
-    .loading {
-      text-align: center;
-      padding: 80px;
-      color: var(--text-muted);
-    }
-
-    /* Event Detail */
-    .back-link {
-      color: var(--text-muted);
-      text-decoration: none;
-      font-size: 13px;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      margin-bottom: 24px;
-      cursor: pointer;
-      transition: color 0.15s;
-    }
-
-    .back-link:hover { color: var(--text); }
-
-    .detail-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 32px;
-    }
-
-    .detail-title {
-      font-family: 'SF Mono', 'Fira Code', monospace;
-      font-size: 20px;
-      font-weight: 600;
-      color: var(--accent);
-    }
-
-    .detail-badge { margin-left: 12px; }
-
-    /* Pagination */
-    .pagination {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 12px 16px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-top: none;
-      border-radius: 0 0 var(--radius) var(--radius);
-      font-size: 13px;
-      color: var(--text-muted);
-    }
-
-    .pagination-buttons {
-      display: flex;
-      gap: 8px;
-    }
-
-    .pagination-btn {
-      background: var(--bg);
-      border: 1px solid var(--border);
-      color: var(--text);
-      padding: 4px 12px;
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: 12px;
-      transition: background 0.15s;
-    }
-
-    .pagination-btn:hover:not(:disabled) { background: var(--surface-hover); }
-    .pagination-btn:disabled { opacity: 0.3; cursor: default; }
-
-    .events-table.has-pagination { border-radius: var(--radius) var(--radius) 0 0; }
+    [data-flow] svg { position: absolute; top: 0; left: 0; pointer-events: none; }
   </style>
 </head>
-<body>
-  <div class="container">
-    <header>
-      <div class="logo">
-        <div class="logo-icon">O</div>
-        <h1>Orko <span>Dashboard</span></h1>
+<body class="font-sans bg-bg text-txt leading-relaxed min-h-screen transition-colors duration-200">
+  <div class="max-w-[1200px] mx-auto py-8 px-6">
+    <header class="flex items-center justify-between mb-10">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 bg-accent rounded-lg flex items-center justify-center font-bold text-base text-white">O</div>
+        <h1 class="text-[22px] font-semibold tracking-tight">Orko <span class="text-txt-muted font-normal text-sm ml-2">Dashboard</span></h1>
       </div>
-      <button class="btn" id="header-action">Refresh</button>
+      <div class="flex items-center gap-2">
+        <button class="bg-surface border border-border text-txt w-9 h-9 rounded-lg cursor-pointer text-base transition-colors inline-flex items-center justify-center hover:bg-surface-hover" id="theme-toggle" title="Toggle theme"></button>
+        <button class="bg-surface border border-border text-txt py-2 px-4 rounded-lg cursor-pointer text-[13px] transition-colors inline-flex items-center gap-1.5 hover:bg-surface-hover" id="header-action">Refresh</button>
+      </div>
     </header>
     <div id="content">
-      <div class="loading">Loading...</div>
+      <div class="text-center py-20 text-txt-muted">Loading...</div>
     </div>
   </div>
 
   <script>
+    // Theme toggle
+    function isDark() {
+      return document.documentElement.classList.contains('dark');
+    }
+
+    function updateThemeIcon() {
+      var btn = document.getElementById('theme-toggle');
+      if (btn) btn.textContent = isDark() ? '\\u2600' : '\\u263E';
+    }
+
+    function toggleTheme() {
+      var html = document.documentElement;
+      html.classList.toggle('dark');
+      var theme = isDark() ? 'dark' : 'light';
+      localStorage.setItem('orko-theme', theme);
+      updateThemeIcon();
+      // Redraw flow connections since colors may change
+      requestAnimationFrame(drawFlowConnections);
+    }
+
+    document.getElementById('theme-toggle').onclick = toggleTheme;
+    updateThemeIcon();
+
     function getBase() {
       const p = window.location.pathname;
       return p.endsWith('/') ? p : p + '/';
@@ -424,7 +156,7 @@ export function getDashboardHtml(): string {
         renderDashboard(data);
       } catch (err) {
         document.getElementById('content').innerHTML =
-          '<div class="empty-state"><p>Failed to load data. Check the console for errors.</p></div>';
+          '<div class="text-center p-12 text-txt-muted bg-surface border border-border rounded-[10px]"><p class="text-sm">Failed to load data. Check the console for errors.</p></div>';
         console.error('Orko Dashboard: Failed to fetch introspection data', err);
       }
     }
@@ -434,7 +166,7 @@ export function getDashboardHtml(): string {
       btn.textContent = 'Refresh';
       btn.onclick = () => showEventDetail(eventType);
 
-      document.getElementById('content').innerHTML = '<div class="loading">Loading...</div>';
+      document.getElementById('content').innerHTML = '<div class="text-center py-20 text-txt-muted">Loading...</div>';
 
       try {
         if (!cachedIntrospection) await fetchIntrospection();
@@ -443,7 +175,7 @@ export function getDashboardHtml(): string {
         renderEventDetail(eventType, eventInfo, metrics);
       } catch (err) {
         document.getElementById('content').innerHTML =
-          '<div class="empty-state"><p>Failed to load event data.</p></div>';
+          '<div class="text-center p-12 text-txt-muted bg-surface border border-border rounded-[10px]"><p class="text-sm">Failed to load event data.</p></div>';
         console.error('Orko Dashboard: Failed to fetch event metrics', err);
       }
     }
@@ -453,20 +185,20 @@ export function getDashboardHtml(): string {
       btn.textContent = 'Refresh';
       btn.onclick = () => showWorkflowDetail(workflowName);
 
-      document.getElementById('content').innerHTML = '<div class="loading">Loading...</div>';
+      document.getElementById('content').innerHTML = '<div class="text-center py-20 text-txt-muted">Loading...</div>';
 
       try {
         if (!cachedIntrospection) await fetchIntrospection();
         const wf = cachedIntrospection.workflows.find(w => w.name === workflowName);
         if (!wf) {
           document.getElementById('content').innerHTML =
-            '<div class="empty-state"><p>Workflow not found.</p></div>';
+            '<div class="text-center p-12 text-txt-muted bg-surface border border-border rounded-[10px]"><p class="text-sm">Workflow not found.</p></div>';
           return;
         }
         renderWorkflowDetail(wf);
       } catch (err) {
         document.getElementById('content').innerHTML =
-          '<div class="empty-state"><p>Failed to load workflow data.</p></div>';
+          '<div class="text-center p-12 text-txt-muted bg-surface border border-border rounded-[10px]"><p class="text-sm">Failed to load workflow data.</p></div>';
         console.error('Orko Dashboard: Failed to fetch workflow data', err);
       }
     }
@@ -474,11 +206,11 @@ export function getDashboardHtml(): string {
     function renderWorkflowDetail(wf) {
       let html = '';
 
-      html += '<a class="back-link" onclick="window.location.hash=\\'#/\\'">\u2190 Back to Dashboard</a>';
+      html += '<a class="text-txt-muted no-underline text-[13px] inline-flex items-center gap-1.5 mb-6 cursor-pointer transition-colors hover:text-txt" onclick="window.location.hash=\\'#/\\'">\u2190 Back to Dashboard</a>';
 
-      html += '<div class="detail-header">';
+      html += '<div class="flex items-center justify-between mb-8">';
       html += '<div>';
-      html += '<div class="detail-title">' + esc(wf.name) + '</div>';
+      html += '<div class="font-mono text-xl font-semibold text-accent">' + esc(wf.name) + '</div>';
       html += '</div>';
       html += '</div>';
 
@@ -490,36 +222,36 @@ export function getDashboardHtml(): string {
       }
       var mainCount = wf.steps.filter(function(st) { return !branchTargets.has(st.type); }).length;
 
-      html += '<div class="stats">';
+      html += '<div class="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-4 mb-10">';
       html += statCard('Total Steps', wf.steps.length, 'accent');
       html += statCard('Main Flow', mainCount);
       html += statCard('Branches', branchTargets.size);
       html += '</div>';
 
       // Flow diagram
-      html += '<div class="section">';
-      html += '<div class="section-header">Flow Diagram</div>';
+      html += '<div class="mb-10">';
+      html += '<div class="text-base font-semibold mb-4 flex items-center gap-2">Flow Diagram</div>';
       html += workflowCard(wf);
       html += '</div>';
 
       // Steps table
-      html += '<div class="section">';
-      html += '<div class="section-header">Steps <span class="count">' + wf.steps.length + '</span></div>';
-      html += '<table class="events-table">';
-      html += '<thead><tr><th>Step</th><th>Retries</th><th>On Success</th><th>On Failure</th></tr></thead>';
+      html += '<div class="mb-10">';
+      html += '<div class="text-base font-semibold mb-4 flex items-center gap-2">Steps <span class="bg-accent-dim text-accent text-xs py-0.5 px-2 rounded-full font-medium">' + wf.steps.length + '</span></div>';
+      html += '<table class="events-table w-full bg-surface border border-border rounded-[10px] overflow-hidden">';
+      html += '<thead><tr><th class="p-3 px-4 text-[11px] uppercase tracking-wide text-txt-muted border-b border-border bg-surface">Step</th><th class="p-3 px-4 text-[11px] uppercase tracking-wide text-txt-muted border-b border-border bg-surface">Retries</th><th class="p-3 px-4 text-[11px] uppercase tracking-wide text-txt-muted border-b border-border bg-surface">On Success</th><th class="p-3 px-4 text-[11px] uppercase tracking-wide text-txt-muted border-b border-border bg-surface">On Failure</th></tr></thead>';
       html += '<tbody>';
       for (var i = 0; i < wf.steps.length; i++) {
         var step = wf.steps[i];
         var retryBadge = step.retry
-          ? '<span class="badge badge-retry">' + step.retry.maxRetries + ' retries</span>'
-          : '<span class="badge badge-none">No retry</span>';
+          ? '<span class="inline-block text-[11px] py-0.5 px-2 rounded-full font-medium bg-warning-dim text-warning">' + step.retry.maxRetries + ' retries</span>'
+          : '<span class="inline-block text-[11px] py-0.5 px-2 rounded-full font-medium bg-border text-txt-muted">No retry</span>';
         var successBadge = step.onSuccess
-          ? '<span class="badge badge-retry">' + esc(step.onSuccess) + '</span>'
-          : '<span class="badge badge-none">\u2014</span>';
+          ? '<span class="inline-block text-[11px] py-0.5 px-2 rounded-full font-medium bg-warning-dim text-warning">' + esc(step.onSuccess) + '</span>'
+          : '<span class="inline-block text-[11px] py-0.5 px-2 rounded-full font-medium bg-border text-txt-muted">\u2014</span>';
         var failBadge = step.onFailure
-          ? '<span class="badge" style="background:var(--danger-dim);color:var(--danger)">' + esc(step.onFailure) + '</span>'
-          : '<span class="badge badge-none">\u2014</span>';
-        html += '<tr><td class="event-type">' + esc(step.type) + '</td><td>' + retryBadge + '</td><td>' + successBadge + '</td><td>' + failBadge + '</td></tr>';
+          ? '<span class="inline-block text-[11px] py-0.5 px-2 rounded-full font-medium bg-danger-dim text-danger">' + esc(step.onFailure) + '</span>'
+          : '<span class="inline-block text-[11px] py-0.5 px-2 rounded-full font-medium bg-border text-txt-muted">\u2014</span>';
+        html += '<tr><td class="p-3 px-4 border-b border-border text-sm font-mono text-[13px] text-accent">' + esc(step.type) + '</td><td class="p-3 px-4 border-b border-border text-sm">' + retryBadge + '</td><td class="p-3 px-4 border-b border-border text-sm">' + successBadge + '</td><td class="p-3 px-4 border-b border-border text-sm">' + failBadge + '</td></tr>';
       }
       html += '</tbody></table>';
       html += '</div>';
@@ -533,7 +265,7 @@ export function getDashboardHtml(): string {
       let html = '';
 
       // Stats
-      html += '<div class="stats">';
+      html += '<div class="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-4 mb-10">';
       html += statCard('Events', events.length);
       html += statCard('Workflows', workflows.length);
       const totalSteps = workflows.reduce((sum, w) => sum + w.steps.length, 0);
@@ -541,10 +273,10 @@ export function getDashboardHtml(): string {
       html += '</div>';
 
       // Events
-      html += '<div class="section">';
-      html += '<div class="section-header">Events <span class="count">' + events.length + '</span></div>';
+      html += '<div class="mb-10">';
+      html += '<div class="text-base font-semibold mb-4 flex items-center gap-2">Events <span class="bg-accent-dim text-accent text-xs py-0.5 px-2 rounded-full font-medium">' + events.length + '</span></div>';
       if (events.length === 0) {
-        html += '<div class="empty-state"><p>No events registered</p></div>';
+        html += '<div class="text-center p-12 text-txt-muted bg-surface border border-border rounded-[10px]"><p class="text-sm">No events registered</p></div>';
       } else {
         var eTotalPages = Math.ceil(events.length / PAGE_SIZE);
         if (eventsPage >= eTotalPages) eventsPage = eTotalPages - 1;
@@ -552,34 +284,34 @@ export function getDashboardHtml(): string {
         var eSlice = events.slice(eStart, eStart + PAGE_SIZE);
         var needsEPag = events.length > PAGE_SIZE;
 
-        html += '<table class="events-table' + (needsEPag ? ' has-pagination' : '') + '">';
-        html += '<thead><tr><th>Event Type</th><th>Retries</th></tr></thead>';
+        html += '<table class="events-table w-full bg-surface border border-border ' + (needsEPag ? 'rounded-t-[10px]' : 'rounded-[10px]') + ' overflow-hidden">';
+        html += '<thead><tr><th class="p-3 px-4 text-[11px] uppercase tracking-wide text-txt-muted border-b border-border bg-surface">Event Type</th><th class="p-3 px-4 text-[11px] uppercase tracking-wide text-txt-muted border-b border-border bg-surface">Retries</th></tr></thead>';
         html += '<tbody>';
         for (var ei = 0; ei < eSlice.length; ei++) {
           var event = eSlice[ei];
           var retryBadge = event.retry
-            ? '<span class="badge badge-retry">' + event.retry.maxRetries + ' retries</span>'
-            : '<span class="badge badge-none">No retry</span>';
-          html += '<tr class="clickable" onclick="window.location.hash=\\'#/events/' + encodeURIComponent(event.type) + '\\'"><td class="event-type">' + esc(event.type) + '</td><td>' + retryBadge + '</td></tr>';
+            ? '<span class="inline-block text-[11px] py-0.5 px-2 rounded-full font-medium bg-warning-dim text-warning">' + event.retry.maxRetries + ' retries</span>'
+            : '<span class="inline-block text-[11px] py-0.5 px-2 rounded-full font-medium bg-border text-txt-muted">No retry</span>';
+          html += '<tr class="cursor-pointer transition-colors hover:bg-surface-hover" onclick="window.location.hash=\\'#/events/' + encodeURIComponent(event.type) + '\\'"><td class="p-3 px-4 border-b border-border text-sm font-mono text-[13px] text-accent">' + esc(event.type) + '</td><td class="p-3 px-4 border-b border-border text-sm">' + retryBadge + '</td></tr>';
         }
         html += '</tbody></table>';
 
         if (needsEPag) {
-          html += '<div class="pagination">';
+          html += '<div class="flex items-center justify-between p-3 px-4 bg-surface border border-border border-t-0 rounded-b-[10px] text-[13px] text-txt-muted">';
           html += '<span>' + (eStart + 1) + '\u2013' + Math.min(eStart + PAGE_SIZE, events.length) + ' of ' + events.length + '</span>';
-          html += '<div class="pagination-buttons">';
-          html += '<button class="pagination-btn" id="events-prev"' + (eventsPage === 0 ? ' disabled' : '') + '>\u2190 Prev</button>';
-          html += '<button class="pagination-btn" id="events-next"' + (eventsPage >= eTotalPages - 1 ? ' disabled' : '') + '>Next \u2192</button>';
+          html += '<div class="flex gap-2">';
+          html += '<button class="bg-bg border border-border text-txt py-1 px-3 rounded-md cursor-pointer text-xs transition-colors hover:bg-surface-hover disabled:opacity-30 disabled:cursor-default" id="events-prev"' + (eventsPage === 0 ? ' disabled' : '') + '>\u2190 Prev</button>';
+          html += '<button class="bg-bg border border-border text-txt py-1 px-3 rounded-md cursor-pointer text-xs transition-colors hover:bg-surface-hover disabled:opacity-30 disabled:cursor-default" id="events-next"' + (eventsPage >= eTotalPages - 1 ? ' disabled' : '') + '>Next \u2192</button>';
           html += '</div></div>';
         }
       }
       html += '</div>';
 
       // Workflows
-      html += '<div class="section">';
-      html += '<div class="section-header">Workflows <span class="count">' + workflows.length + '</span></div>';
+      html += '<div class="mb-10">';
+      html += '<div class="text-base font-semibold mb-4 flex items-center gap-2">Workflows <span class="bg-accent-dim text-accent text-xs py-0.5 px-2 rounded-full font-medium">' + workflows.length + '</span></div>';
       if (workflows.length === 0) {
-        html += '<div class="empty-state"><p>No workflows registered</p></div>';
+        html += '<div class="text-center p-12 text-txt-muted bg-surface border border-border rounded-[10px]"><p class="text-sm">No workflows registered</p></div>';
       } else {
         var wTotalPages = Math.ceil(workflows.length / PAGE_SIZE);
         if (workflowsPage >= wTotalPages) workflowsPage = wTotalPages - 1;
@@ -587,8 +319,8 @@ export function getDashboardHtml(): string {
         var wSlice = workflows.slice(wStart, wStart + PAGE_SIZE);
         var needsWPag = workflows.length > PAGE_SIZE;
 
-        html += '<table class="events-table' + (needsWPag ? ' has-pagination' : '') + '">';
-        html += '<thead><tr><th>Workflow Name</th><th>Steps</th><th>Callbacks</th></tr></thead>';
+        html += '<table class="events-table w-full bg-surface border border-border ' + (needsWPag ? 'rounded-t-[10px]' : 'rounded-[10px]') + ' overflow-hidden">';
+        html += '<thead><tr><th class="p-3 px-4 text-[11px] uppercase tracking-wide text-txt-muted border-b border-border bg-surface">Workflow Name</th><th class="p-3 px-4 text-[11px] uppercase tracking-wide text-txt-muted border-b border-border bg-surface">Steps</th><th class="p-3 px-4 text-[11px] uppercase tracking-wide text-txt-muted border-b border-border bg-surface">Callbacks</th></tr></thead>';
         html += '<tbody>';
         for (var wi = 0; wi < wSlice.length; wi++) {
           var wf = wSlice[wi];
@@ -597,18 +329,18 @@ export function getDashboardHtml(): string {
           if (wf.onSuccess) callbacks.push('onSuccess');
           if (wf.onFailure) callbacks.push('onFailure');
           var callbacksHtml = callbacks.length > 0
-            ? callbacks.map(function(c) { return '<span class="badge badge-' + (c === 'onComplete' ? 'none' : c === 'onSuccess' ? 'retry' : 'none') + '">' + c + '</span>'; }).join(' ')
-            : '<span class="badge badge-none">None</span>';
-          html += '<tr class="clickable" onclick="window.location.hash=\\'#/workflows/' + encodeURIComponent(wf.name) + '\\'"><td class="event-type">' + esc(wf.name) + '</td><td>' + wf.steps.length + ' steps</td><td>' + callbacksHtml + '</td></tr>';
+            ? callbacks.map(function(c) { return '<span class="inline-block text-[11px] py-0.5 px-2 rounded-full font-medium ' + (c === 'onSuccess' ? 'bg-warning-dim text-warning' : 'bg-border text-txt-muted') + '">' + c + '</span>'; }).join(' ')
+            : '<span class="inline-block text-[11px] py-0.5 px-2 rounded-full font-medium bg-border text-txt-muted">None</span>';
+          html += '<tr class="cursor-pointer transition-colors hover:bg-surface-hover" onclick="window.location.hash=\\'#/workflows/' + encodeURIComponent(wf.name) + '\\'"><td class="p-3 px-4 border-b border-border text-sm font-mono text-[13px] text-accent">' + esc(wf.name) + '</td><td class="p-3 px-4 border-b border-border text-sm">' + wf.steps.length + ' steps</td><td class="p-3 px-4 border-b border-border text-sm">' + callbacksHtml + '</td></tr>';
         }
         html += '</tbody></table>';
 
         if (needsWPag) {
-          html += '<div class="pagination">';
+          html += '<div class="flex items-center justify-between p-3 px-4 bg-surface border border-border border-t-0 rounded-b-[10px] text-[13px] text-txt-muted">';
           html += '<span>' + (wStart + 1) + '\u2013' + Math.min(wStart + PAGE_SIZE, workflows.length) + ' of ' + workflows.length + '</span>';
-          html += '<div class="pagination-buttons">';
-          html += '<button class="pagination-btn" id="workflows-prev"' + (workflowsPage === 0 ? ' disabled' : '') + '>\u2190 Prev</button>';
-          html += '<button class="pagination-btn" id="workflows-next"' + (workflowsPage >= wTotalPages - 1 ? ' disabled' : '') + '>Next \u2192</button>';
+          html += '<div class="flex gap-2">';
+          html += '<button class="bg-bg border border-border text-txt py-1 px-3 rounded-md cursor-pointer text-xs transition-colors hover:bg-surface-hover disabled:opacity-30 disabled:cursor-default" id="workflows-prev"' + (workflowsPage === 0 ? ' disabled' : '') + '>\u2190 Prev</button>';
+          html += '<button class="bg-bg border border-border text-txt py-1 px-3 rounded-md cursor-pointer text-xs transition-colors hover:bg-surface-hover disabled:opacity-30 disabled:cursor-default" id="workflows-next"' + (workflowsPage >= wTotalPages - 1 ? ' disabled' : '') + '>Next \u2192</button>';
           html += '</div></div>';
         }
       }
@@ -627,13 +359,17 @@ export function getDashboardHtml(): string {
       if (wnext) wnext.onclick = function() { workflowsPage++; renderDashboard(data); };
     }
 
+    function getSeqColor() {
+      return getComputedStyle(document.documentElement).getPropertyValue('--color-seq').trim();
+    }
+
     function drawFlowConnections() {
-      var flows = document.querySelectorAll('.workflow-flow');
+      var flows = document.querySelectorAll('[data-flow]');
       flows.forEach(function(flow) {
-        var grid = flow.querySelector('.flow-grid');
+        var grid = flow.querySelector('[data-flow-grid]');
         if (!grid) return;
 
-        var nodes = grid.querySelectorAll('.flow-node');
+        var nodes = grid.querySelectorAll('[data-flow-node]');
         if (nodes.length === 0) return;
 
         // Remove old SVG
@@ -684,19 +420,17 @@ export function getDashboardHtml(): string {
         var mainNodes = grid.querySelectorAll('[data-id^="main-"]');
         var colCount = mainNodes.length;
 
+        var seqColor = getSeqColor();
+        var successColor = '#34d399';
+        var failColor = '#f87171';
+
         for (var col = 0; col < colCount; col++) {
           var main = nodeRect('main-' + col);
           var nextMain = nodeRect('main-' + (col + 1));
           var succBranch = nodeRect('branch-success-' + col);
           var failBranch = nodeRect('branch-failure-' + col);
 
-          var seqColor = '#6e6e82';
-          var successColor = '#34d399';
-          var failColor = '#f87171';
-
           if (succBranch && failBranch) {
-            // Has branches: draw curves from main to success (up) and failure (down)
-            // Main -> Success branch (curve up-right)
             var sx = main.right;
             var sy = main.cy;
             var ex = succBranch.left;
@@ -705,13 +439,11 @@ export function getDashboardHtml(): string {
             makePath('M' + sx + ',' + sy + ' C' + cpx + ',' + sy + ' ' + cpx + ',' + ey + ' ' + ex + ',' + ey, successColor);
             makeArrowHead(ex, ey, successColor);
 
-            // Main -> Failure branch (curve down-right)
             ey = failBranch.cy;
             ex = failBranch.left;
             makePath('M' + sx + ',' + sy + ' C' + cpx + ',' + sy + ' ' + cpx + ',' + ey + ' ' + ex + ',' + ey, failColor);
             makeArrowHead(ex, ey, failColor);
 
-            // Success branch -> next main (curve down-right to converge)
             if (nextMain) {
               sx = succBranch.right;
               sy = succBranch.cy;
@@ -720,14 +452,12 @@ export function getDashboardHtml(): string {
               cpx = sx + (ex - sx) * 0.5;
               makePath('M' + sx + ',' + sy + ' C' + cpx + ',' + sy + ' ' + cpx + ',' + ey + ' ' + ex + ',' + ey, successColor, true);
 
-              // Failure branch -> next main (curve up-right to converge)
               sx = failBranch.right;
               sy = failBranch.cy;
               makePath('M' + sx + ',' + sy + ' C' + cpx + ',' + sy + ' ' + cpx + ',' + ey + ' ' + ex + ',' + ey, failColor, true);
               makeArrowHead(ex, ey, seqColor);
             }
           } else if (succBranch) {
-            // Only success branch
             var sx = main.right; var sy = main.cy;
             var ex = succBranch.left; var ey = succBranch.cy;
             var cpx = sx + (ex - sx) * 0.5;
@@ -740,7 +470,6 @@ export function getDashboardHtml(): string {
               makePath('M' + sx + ',' + sy + ' C' + cpx + ',' + sy + ' ' + cpx + ',' + ey + ' ' + ex + ',' + ey, successColor, true);
               makeArrowHead(ex, ey, seqColor);
             }
-            // Also draw sequential from main to next if no failure branch
             if (nextMain) {
               sx = main.right; sy = main.cy;
               ex = nextMain.left; ey = nextMain.cy;
@@ -748,7 +477,6 @@ export function getDashboardHtml(): string {
               makeArrowHead(ex, ey, seqColor);
             }
           } else if (failBranch) {
-            // Only failure branch
             var sx = main.right; var sy = main.cy;
             var ex = failBranch.left; var ey = failBranch.cy;
             var cpx = sx + (ex - sx) * 0.5;
@@ -761,7 +489,6 @@ export function getDashboardHtml(): string {
               makePath('M' + sx + ',' + sy + ' C' + cpx + ',' + sy + ' ' + cpx + ',' + ey + ' ' + ex + ',' + ey, failColor, true);
               makeArrowHead(ex, ey, seqColor);
             }
-            // Also draw sequential from main to next
             if (nextMain) {
               sx = main.right; sy = main.cy;
               ex = nextMain.left; ey = nextMain.cy;
@@ -769,7 +496,6 @@ export function getDashboardHtml(): string {
               makeArrowHead(ex, ey, seqColor);
             }
           } else if (nextMain) {
-            // No branches - straight sequential arrow
             var sx = main.right;
             var sy = main.cy;
             var ex = nextMain.left;
@@ -786,18 +512,18 @@ export function getDashboardHtml(): string {
     function renderEventDetail(eventType, eventInfo, metrics) {
       let html = '';
 
-      html += '<a class="back-link" onclick="window.location.hash=\\'#/\\'">\u2190 Back to Dashboard</a>';
+      html += '<a class="text-txt-muted no-underline text-[13px] inline-flex items-center gap-1.5 mb-6 cursor-pointer transition-colors hover:text-txt" onclick="window.location.hash=\\'#/\\'">\u2190 Back to Dashboard</a>';
 
-      html += '<div class="detail-header">';
+      html += '<div class="flex items-center justify-between mb-8">';
       html += '<div>';
-      html += '<div class="detail-title">' + esc(eventType) + '</div>';
+      html += '<div class="font-mono text-xl font-semibold text-accent">' + esc(eventType) + '</div>';
       if (eventInfo && eventInfo.retry) {
-        html += '<span class="badge badge-retry detail-badge">' + eventInfo.retry.maxRetries + ' retries</span>';
+        html += '<span class="inline-block text-[11px] py-0.5 px-2 rounded-full font-medium bg-warning-dim text-warning ml-3">' + eventInfo.retry.maxRetries + ' retries</span>';
       }
       html += '</div>';
       html += '</div>';
 
-      html += '<div class="stats">';
+      html += '<div class="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-4 mb-10">';
       html += statCard('Received', metrics.received, 'accent');
       html += statCard('Completed', metrics.completed, 'success');
       html += statCard('Failed', metrics.failed, 'danger');
@@ -807,23 +533,26 @@ export function getDashboardHtml(): string {
     }
 
     function statCard(label, value, variant) {
-      const cls = variant ? ' ' + variant : '';
-      return '<div class="stat-card' + cls + '"><div class="label">' + label + '</div><div class="value">' + value + '</div></div>';
+      var colorClass = '';
+      if (variant === 'accent') colorClass = 'text-accent';
+      else if (variant === 'success') colorClass = 'text-success';
+      else if (variant === 'danger') colorClass = 'text-danger';
+      return '<div class="bg-surface border border-border rounded-[10px] p-5"><div class="text-xs text-txt-muted uppercase tracking-wide">' + label + '</div><div class="text-[32px] font-bold mt-1 ' + colorClass + '">' + value + '</div></div>';
     }
 
     function workflowCard(wf) {
-      let html = '<div class="workflow-card" data-workflow="' + esc(wf.name) + '">';
+      let html = '<div class="bg-surface border border-border rounded-[10px] p-6 mb-4">';
 
-      // Identify branch targets (steps referenced by onSuccess/onFailure)
+      // Identify branch targets
       var branchTargets = new Set();
-      var branchMap = {}; // parentType -> { onSuccess: stepType, onFailure: stepType }
+      var branchMap = {};
       for (var s = 0; s < wf.steps.length; s++) {
         var st = wf.steps[s];
         if (st.onSuccess) { branchTargets.add(st.onSuccess); branchMap[st.type] = branchMap[st.type] || {}; branchMap[st.type].onSuccess = st.onSuccess; }
         if (st.onFailure) { branchTargets.add(st.onFailure); branchMap[st.type] = branchMap[st.type] || {}; branchMap[st.type].onFailure = st.onFailure; }
       }
 
-      // Build main flow (skip branch targets)
+      // Build main flow
       var mainSteps = [];
       for (var s = 0; s < wf.steps.length; s++) {
         if (!branchTargets.has(wf.steps[s].type)) {
@@ -831,7 +560,6 @@ export function getDashboardHtml(): string {
         }
       }
 
-      // Find branch step data by type
       function findStep(type) {
         for (var s = 0; s < wf.steps.length; s++) {
           if (wf.steps[s].type === type) return wf.steps[s];
@@ -839,9 +567,7 @@ export function getDashboardHtml(): string {
         return null;
       }
 
-      // Build grid: 3 rows, columns advance separately for branches
-      // Row 1 = success branches, Row 2 = main flow, Row 3 = failure branches
-      html += '<div class="workflow-flow"><div class="flow-grid">';
+      html += '<div class="relative overflow-x-auto py-2" data-flow><div class="grid grid-flow-col grid-rows-[auto_auto_auto] gap-x-10 gap-y-4 items-center relative" data-flow-grid>';
 
       var gridCol = 1;
       for (var col = 0; col < mainSteps.length; col++) {
@@ -849,40 +575,38 @@ export function getDashboardHtml(): string {
         var branches = branchMap[ms.type];
 
         // Main step column
-        html += '<div class="flow-spacer" style="grid-row:1;grid-column:' + gridCol + '"></div>';
-        html += '<div class="flow-node" data-id="main-' + col + '" style="grid-row:2;grid-column:' + gridCol + '">';
-        html += '<div class="node-type">' + esc(ms.type) + '</div>';
-        if (ms.retry) html += '<span class="badge badge-retry">' + ms.retry.maxRetries + ' retries</span>';
+        html += '<div class="invisible min-w-[140px] p-3 px-4" style="grid-row:1;grid-column:' + gridCol + '"></div>';
+        html += '<div class="bg-bg border border-border rounded-lg p-3 px-4 min-w-[140px] text-center" data-flow-node data-id="main-' + col + '" style="grid-row:2;grid-column:' + gridCol + '">';
+        html += '<div class="font-mono text-xs font-medium">' + esc(ms.type) + '</div>';
+        if (ms.retry) html += '<span class="inline-block text-[11px] py-0.5 px-2 rounded-full font-medium bg-warning-dim text-warning">' + ms.retry.maxRetries + ' retries</span>';
         html += '</div>';
-        html += '<div class="flow-spacer" style="grid-row:3;grid-column:' + gridCol + '"></div>';
+        html += '<div class="invisible min-w-[140px] p-3 px-4" style="grid-row:3;grid-column:' + gridCol + '"></div>';
 
-        // If this step has branches, add them in the next column
         if (branches && (branches.onSuccess || branches.onFailure)) {
           gridCol++;
 
           if (branches.onSuccess) {
             var succStep = findStep(branches.onSuccess);
-            html += '<div class="flow-node branch-success" data-id="branch-success-' + col + '" style="grid-row:1;grid-column:' + gridCol + '">';
-            html += '<div class="node-type">' + esc(branches.onSuccess) + '</div>';
-            html += '<div class="node-label label-success">on success</div>';
-            if (succStep && succStep.retry) html += '<span class="badge badge-retry">' + succStep.retry.maxRetries + ' retries</span>';
+            html += '<div class="bg-bg border border-success rounded-lg p-3 px-4 min-w-[140px] text-center" data-flow-node data-id="branch-success-' + col + '" style="grid-row:1;grid-column:' + gridCol + '">';
+            html += '<div class="font-mono text-xs font-medium">' + esc(branches.onSuccess) + '</div>';
+            html += '<div class="text-[10px] mt-1 text-success">on success</div>';
+            if (succStep && succStep.retry) html += '<span class="inline-block text-[11px] py-0.5 px-2 rounded-full font-medium bg-warning-dim text-warning">' + succStep.retry.maxRetries + ' retries</span>';
             html += '</div>';
           } else {
-            html += '<div class="flow-spacer" style="grid-row:1;grid-column:' + gridCol + '"></div>';
+            html += '<div class="invisible min-w-[140px] p-3 px-4" style="grid-row:1;grid-column:' + gridCol + '"></div>';
           }
 
-          // Empty middle row for branches column
-          html += '<div class="flow-spacer" style="grid-row:2;grid-column:' + gridCol + '"></div>';
+          html += '<div class="invisible min-w-[140px] p-3 px-4" style="grid-row:2;grid-column:' + gridCol + '"></div>';
 
           if (branches.onFailure) {
             var failStep = findStep(branches.onFailure);
-            html += '<div class="flow-node branch-failure" data-id="branch-failure-' + col + '" style="grid-row:3;grid-column:' + gridCol + '">';
-            html += '<div class="node-type">' + esc(branches.onFailure) + '</div>';
-            html += '<div class="node-label label-failure">on failure</div>';
-            if (failStep && failStep.retry) html += '<span class="badge badge-retry">' + failStep.retry.maxRetries + ' retries</span>';
+            html += '<div class="bg-bg border border-danger rounded-lg p-3 px-4 min-w-[140px] text-center" data-flow-node data-id="branch-failure-' + col + '" style="grid-row:3;grid-column:' + gridCol + '">';
+            html += '<div class="font-mono text-xs font-medium">' + esc(branches.onFailure) + '</div>';
+            html += '<div class="text-[10px] mt-1 text-danger">on failure</div>';
+            if (failStep && failStep.retry) html += '<span class="inline-block text-[11px] py-0.5 px-2 rounded-full font-medium bg-warning-dim text-warning">' + failStep.retry.maxRetries + ' retries</span>';
             html += '</div>';
           } else {
-            html += '<div class="flow-spacer" style="grid-row:3;grid-column:' + gridCol + '"></div>';
+            html += '<div class="invisible min-w-[140px] p-3 px-4" style="grid-row:3;grid-column:' + gridCol + '"></div>';
           }
         }
 
@@ -894,10 +618,10 @@ export function getDashboardHtml(): string {
       // Workflow-level callbacks
       var hasCallbacks = wf.onComplete || wf.onSuccess || wf.onFailure;
       if (hasCallbacks) {
-        html += '<div class="workflow-callbacks">';
-        if (wf.onComplete) html += '<span class="callback-tag callback-complete">onComplete \u2192 ' + esc(wf.onComplete) + '</span>';
-        if (wf.onSuccess) html += '<span class="callback-tag callback-success">onSuccess \u2192 ' + esc(wf.onSuccess) + '</span>';
-        if (wf.onFailure) html += '<span class="callback-tag callback-failure">onFailure \u2192 ' + esc(wf.onFailure) + '</span>';
+        html += '<div class="flex gap-3 mt-4 pt-4 border-t border-border flex-wrap">';
+        if (wf.onComplete) html += '<span class="text-xs py-1 px-2.5 rounded-md font-mono bg-accent-dim text-accent">onComplete \u2192 ' + esc(wf.onComplete) + '</span>';
+        if (wf.onSuccess) html += '<span class="text-xs py-1 px-2.5 rounded-md font-mono bg-success-dim text-success">onSuccess \u2192 ' + esc(wf.onSuccess) + '</span>';
+        if (wf.onFailure) html += '<span class="text-xs py-1 px-2.5 rounded-md font-mono bg-danger-dim text-danger">onFailure \u2192 ' + esc(wf.onFailure) + '</span>';
         html += '</div>';
       }
 
