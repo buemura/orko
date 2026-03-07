@@ -19,10 +19,8 @@ Items are organized by priority (P0 > P1 > P2 > P3). Security-sensitive items ar
 `ioredis.publish()` returns a `Promise<number>` that is never awaited or caught. If Redis is temporarily unavailable, errors are silently swallowed. This affects every event publish and every workflow step transition. The `TransportManager` interface declares `publishMessage` as `void`, which forces this silent discard.
 **Fix:** Add `.catch()` error handling in `RedisManager.publishMessage`, or change the interface to return `Promise<void>`.
 
-### TD-03: Noop handler injection masks missing `@OnWorkflowStep` in NestJS `[SEC]`
-**Package:** `@synkro/nestjs` — `packages/nestjs/src/synkro.service.ts:30-46`
-Every workflow step without an inline handler is pre-assigned `async () => {}` before `@OnWorkflowStep`-decorated methods are discovered. This bypasses the core's fail-fast validation (`"step has no handler"` error). If a decorator is mistyped or its class is not registered as a NestJS provider, the workflow silently runs the noop and advances — producing incorrect behavior with no error. **Security note:** Silent noop execution can skip authorization, validation, or audit steps in a workflow, allowing state transitions that should have been gated.
-**Fix:** Remove the noop pre-fill. Let core validation throw, or add an explicit check after discovery.
+### ~~TD-03: Noop handler injection masks missing `@OnWorkflowStep` in NestJS `[SEC]`~~ ✅ Resolved in v0.5.0
+Removed the noop pre-fill pattern. The module now validates that every workflow step has a handler (inline or via `@OnWorkflowStep` decorator) and throws a descriptive error at startup if any step is missing.
 
 ### TD-04: `processingLocks` is in-process memory — no distributed locking `[SEC]`
 **Package:** `@synkro/core` — `packages/core/src/handlers/handler-registry.ts`
@@ -38,15 +36,11 @@ Multiple concurrent callers can pass the `!this.locks.has(lockKey)` check before
 
 ## P1 - High
 
-### TD-06: No guard when service lifecycle fails before `onModuleDestroy`
-**Package:** `@synkro/nestjs` — `packages/nestjs/src/synkro.service.ts`
-If init fails early, destroy path can throw due to uninitialized `synkro` instance and mask root cause.
-**Fix:** `onModuleDestroy` must be safe when init partially fails and must not throw on undefined instance.
+### ~~TD-06: No guard when service lifecycle fails before `onModuleDestroy`~~ ✅ Resolved in v0.5.0
+`onModuleDestroy` now guards against uninitialized `synkro` instance — safe when init partially fails.
 
-### TD-07: Runtime methods can be called before initialization
-**Package:** `@synkro/nestjs` — `packages/nestjs/src/synkro.service.ts`
-`publish`, `on`, and `getInstance` assume initialized state and may crash with unclear errors in tests/custom bootstrap flows.
-**Fix:** Add explicit readiness checks with actionable error messages or a lazy-init strategy.
+### ~~TD-07: Runtime methods called before initialization~~ ✅ Resolved in v0.5.0
+All public methods (`publish`, `on`, `introspect`, `getEventMetrics`, `getInstance`) now throw a descriptive error if called before the module has completed initialization.
 
 ### TD-08: Duplicate decorator registrations are not validated
 **Package:** `@synkro/nestjs` — `packages/nestjs/src/synkro.service.ts`
@@ -65,11 +59,11 @@ Replace the minimal custom logger with structured JSON logging (e.g., `pino`). I
 Payloads are typed as `unknown` and cast via `as` in handlers. Add an optional schema validation hook per event/step (compatible with `zod`, `class-validator`, or any validator). **Security note:** Unvalidated payloads can carry injection vectors through the system if handlers pass data to databases, templates, or shell commands.
 **Fix:** This prevents runtime type errors and provides clear error messages at the boundary.
 
-### IMP-03: Align NestJS adapter semantics with `@synkro/core`
-Prevent adapter-specific surprises; improve portability between direct core and Nest usage. Reuse/port `patchWorkflowHandlers` semantics from core and remove implicit `noop` fallback. Same workflow config should either boot or fail identically in core and Nest adapter.
+### ~~IMP-03: Align NestJS adapter semantics with `@synkro/core`~~ ✅ Resolved in v0.5.0
+Removed implicit noop fallback. The NestJS adapter now fails fast on missing step handlers, matching core behavior. Added `retention` passthrough for core v0.13.0 parity.
 
-### IMP-04: Expand public service API parity
-Current `SynkroService` hides useful core operations (`introspect`, `getEventMetrics`, maybe `register`). Expose safe wrappers on `SynkroService` for introspection/metrics and document behavior pre-init. Users should be able to access introspection + metrics without `getInstance()` escape hatch.
+### ~~IMP-04: Expand public service API parity~~ ✅ Resolved in v0.5.0
+`SynkroService` now exposes `introspect()` and `getEventMetrics(eventType)` methods directly, matching core's public API.
 
 ### IMP-08: Dashboard authentication support `[SEC]`
 The dashboard handler exposes `/api/introspection` and `/api/events/:type` with zero authentication. **Security note:** Operational metadata (event names, workflow topology, metrics) is accessible to anyone who can reach the endpoint. This leaks internal system architecture.
@@ -210,7 +204,7 @@ Add a middleware/interceptor pipeline for events (e.g., logging, metrics, valida
 
 | Item | Risk | Description |
 |------|------|-------------|
-| TD-03 | Critical | Noop handler silently skips workflow steps — can bypass auth/validation gates |
+| ~~TD-03~~ | ~~Critical~~ | ~~Noop handler silently skips workflow steps~~ ✅ Resolved in v0.5.0 |
 | TD-04 | Critical | In-process-only locks — duplicate processing across instances (replay risk) |
 | TD-05 | Critical | TOCTOU race in `withLock` — concurrent step execution bypasses mutex |
 | IMP-02 | High | No payload validation — injection vectors propagate through handlers |

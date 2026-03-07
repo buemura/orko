@@ -6,8 +6,10 @@ import {
 } from "@nestjs/common";
 import { Synkro } from "@synkro/core";
 import type {
+  EventMetrics,
   HandlerFunction,
   RetryConfig,
+  SynkroIntrospection,
   SynkroOptions,
 } from "@synkro/core";
 
@@ -26,10 +28,9 @@ export class SynkroService implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   async onModuleInit(): Promise<void> {
-    const noop = async () => {};
     const workflows = (this.options.workflows ?? []).map((w) => ({
       ...w,
-      steps: w.steps.map((s) => ({ ...s, handler: s.handler ?? noop })),
+      steps: w.steps.map((s) => ({ ...s })),
     }));
 
     // Patch decorated handler functions into workflow step definitions
@@ -43,6 +44,16 @@ export class SynkroService implements OnModuleInit, OnModuleDestroy {
           step.handler = discovered.handler;
         }
       }
+
+      // Fail fast if any step is missing a handler (TD-03)
+      for (const step of workflow.steps) {
+        if (!step.handler) {
+          throw new Error(
+            `[SynkroModule] - Workflow "${workflow.name}" step "${step.type}" has no handler. ` +
+              `Provide an inline handler or use the @OnWorkflowStep decorator on a registered provider.`,
+          );
+        }
+      }
     }
 
     const synkroOptions: SynkroOptions = {
@@ -50,6 +61,7 @@ export class SynkroService implements OnModuleInit, OnModuleDestroy {
       connectionUrl: this.options.connectionUrl,
       debug: this.options.debug,
       workflows,
+      retention: this.options.retention,
     };
 
     this.synkro = await Synkro.start(synkroOptions);
@@ -62,7 +74,9 @@ export class SynkroService implements OnModuleInit, OnModuleDestroy {
   }
 
   async onModuleDestroy(): Promise<void> {
-    await this.synkro.stop();
+    if (this.synkro) {
+      await this.synkro.stop();
+    }
   }
 
   async publish(
@@ -70,14 +84,35 @@ export class SynkroService implements OnModuleInit, OnModuleDestroy {
     payload?: unknown,
     requestId?: string,
   ): Promise<string> {
+    this.ensureInitialized();
     return this.synkro.publish(event, payload, requestId);
   }
 
   on(eventType: string, handler: HandlerFunction, retry?: RetryConfig): void {
+    this.ensureInitialized();
     this.synkro.on(eventType, handler, retry);
   }
 
+  introspect(): SynkroIntrospection {
+    this.ensureInitialized();
+    return this.synkro.introspect();
+  }
+
+  async getEventMetrics(eventType: string): Promise<EventMetrics> {
+    this.ensureInitialized();
+    return this.synkro.getEventMetrics(eventType);
+  }
+
   getInstance(): Synkro {
+    this.ensureInitialized();
     return this.synkro;
+  }
+
+  private ensureInitialized(): void {
+    if (!this.synkro) {
+      throw new Error(
+        "[SynkroService] - Service is not initialized. Ensure the module has completed startup before calling this method.",
+      );
+    }
   }
 }

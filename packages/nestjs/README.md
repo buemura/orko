@@ -60,28 +60,25 @@ export class NotificationHandler {
 
 ### 3. Define workflows
 
-Define workflow structure in a config file:
+Define workflow structure in a config file using the `NestSynkroWorkflow` type — step handlers are bound via `@OnWorkflowStep` decorators, so no inline handlers or noops are needed:
 
 ```typescript
-import type { SynkroWorkflow } from "@synkro/core";
+import type { NestSynkroWorkflow } from "@synkro/nestjs";
 
-const noop = async () => {};
-
-export const workflows: SynkroWorkflow[] = [
+export const workflows: NestSynkroWorkflow[] = [
   {
     name: "ProcessOrder",
     onSuccess: "StartShipment",
     steps: [
-      { type: "ValidateStock", handler: noop },
+      { type: "ValidateStock" },
       {
         type: "ProcessPayment",
-        handler: noop,
         retry: { maxRetries: 3 },
         onSuccess: "PaymentCompleted",
         onFailure: "PaymentFailed",
       },
-      { type: "PaymentCompleted", handler: noop },
-      { type: "PaymentFailed", handler: noop },
+      { type: "PaymentCompleted" },
+      { type: "PaymentFailed" },
     ],
   },
 ];
@@ -117,6 +114,8 @@ SynkroModule.forRoot({
 });
 ```
 
+> **Note:** Every workflow step must have a handler — either an inline `handler` function in the config or a matching `@OnWorkflowStep` decorator on a registered provider. The module will throw at startup if any step is missing a handler.
+
 ### 4. Publish events
 
 Inject `SynkroService` to publish events or start workflows:
@@ -137,6 +136,23 @@ export class OrderController {
 }
 ```
 
+### 5. Configure retention (optional)
+
+Control Redis key TTLs for locks, deduplication, workflow state, and metrics:
+
+```typescript
+SynkroModule.forRoot({
+  transport: "redis",
+  connectionUrl: "redis://localhost:6379",
+  retention: {
+    lockTtl: 60,       // distributed lock TTL in seconds (default: 300)
+    dedupTtl: 3600,    // deduplication key TTL in seconds (default: 86400)
+    stateTtl: 7200,    // workflow state TTL in seconds (default: 86400)
+    metricsTtl: 86400, // metrics key TTL in seconds (default: no expiry)
+  },
+});
+```
+
 ## API
 
 ### `SynkroModule`
@@ -152,6 +168,9 @@ export class OrderController {
 |---|---|
 | `publish(event, payload?, requestId?)` | Publish an event or start a workflow |
 | `on(eventType, handler, retry?)` | Register an event handler at runtime |
+| `introspect()` | Returns registered events and workflows |
+| `getEventMetrics(eventType)` | Returns event metrics (received, completed, failed) |
+| `getInstance()` | Access the underlying `Synkro` core instance |
 
 ### Decorators
 

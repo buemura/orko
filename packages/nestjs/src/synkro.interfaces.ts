@@ -1,5 +1,6 @@
 import type {
   HandlerFunction,
+  RetentionConfig,
   RetryConfig,
   SynkroWorkflow,
 } from "@synkro/core";
@@ -21,6 +22,7 @@ export interface SynkroModuleOptions {
   connectionUrl?: string;
   debug?: boolean;
   workflows?: NestSynkroWorkflow[];
+  retention?: RetentionConfig;
 }
 
 export interface SynkroModuleAsyncOptions {

@@ -12,3 +12,4 @@ export type {
   NestSynkroWorkflow,
   NestSynkroWorkflowStep,
 } from "./synkro.interfaces.js";
+export type { RetentionConfig } from "@synkro/core";

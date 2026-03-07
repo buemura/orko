@@ -176,6 +176,103 @@ describe("SynkroModule", () => {
     });
   });
 
+  describe("retention config passthrough", () => {
+    it("should pass retention options to core", async () => {
+      const module = await Test.createTestingModule({
+        imports: [
+          SynkroModule.forRoot({
+            transport: "in-memory",
+            retention: {
+              lockTtl: 60,
+              dedupTtl: 3600,
+              stateTtl: 7200,
+              metricsTtl: 86400,
+            },
+          }),
+        ],
+      }).compile();
+
+      await module.init();
+      const service = module.get(SynkroService);
+      expect(service).toBeDefined();
+
+      await module.close();
+    });
+  });
+
+  describe("introspect and getEventMetrics", () => {
+    it("should expose introspect method", async () => {
+      const module = await Test.createTestingModule({
+        imports: [
+          SynkroModule.forRoot({
+            transport: "in-memory",
+          }),
+        ],
+        providers: [TestEventHandler],
+      }).compile();
+
+      await module.init();
+      const service = module.get(SynkroService);
+      const result = service.introspect();
+
+      expect(result).toHaveProperty("events");
+      expect(result).toHaveProperty("workflows");
+      expect(result.events).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ type: "TestEvent" }),
+        ]),
+      );
+
+      await module.close();
+    });
+
+    it("should expose getEventMetrics method", async () => {
+      const module = await Test.createTestingModule({
+        imports: [
+          SynkroModule.forRoot({
+            transport: "in-memory",
+          }),
+        ],
+        providers: [TestEventHandler],
+      }).compile();
+
+      await module.init();
+      const service = module.get(SynkroService);
+      const metrics = await service.getEventMetrics("TestEvent");
+
+      expect(metrics).toEqual({
+        type: "TestEvent",
+        received: 0,
+        completed: 0,
+        failed: 0,
+      });
+
+      await module.close();
+    });
+  });
+
+  describe("missing workflow step handler (TD-03)", () => {
+    it("should throw when a workflow step has no handler and no decorator", async () => {
+      const module = await Test.createTestingModule({
+        imports: [
+          SynkroModule.forRoot({
+            transport: "in-memory",
+            workflows: [
+              {
+                name: "BrokenWorkflow",
+                steps: [{ type: "MissingStep" }],
+              },
+            ],
+          }),
+        ],
+      }).compile();
+
+      await expect(module.init()).rejects.toThrow(
+        'Workflow "BrokenWorkflow" step "MissingStep" has no handler',
+      );
+    });
+  });
+
   describe("lifecycle", () => {
     it("should stop synkro on module destroy", async () => {
       const module = await Test.createTestingModule({
@@ -189,6 +286,37 @@ describe("SynkroModule", () => {
       await module.init();
       // Should not throw
       await module.close();
+    });
+
+    it("should not throw on destroy if init was never called (TD-06)", async () => {
+      const service = new SynkroService(
+        { transport: "in-memory" },
+        {} as any,
+      );
+      // Should not throw
+      await service.onModuleDestroy();
+    });
+
+    it("should throw when publish is called before init (TD-07)", async () => {
+      const service = new SynkroService(
+        { transport: "in-memory" },
+        {} as any,
+      );
+
+      await expect(service.publish("test")).rejects.toThrow(
+        "Service is not initialized",
+      );
+    });
+
+    it("should throw when introspect is called before init (TD-07)", () => {
+      const service = new SynkroService(
+        { transport: "in-memory" },
+        {} as any,
+      );
+
+      expect(() => service.introspect()).toThrow(
+        "Service is not initialized",
+      );
     });
   });
 });
