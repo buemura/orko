@@ -168,7 +168,8 @@ describe("Synkro with decorators", () => {
       handlers: [new MyHandlers()],
     });
 
-    expect(mockSubscribe).toHaveBeenCalledWith("workflow:order-flow:validate");
+    const subscribedChannels = mockSubscribe.mock.calls.flat();
+    expect(subscribedChannels).toContain("workflow:order-flow:validate");
   });
 
   it("should support mixed inline and decorator handlers", async () => {
@@ -193,8 +194,9 @@ describe("Synkro with decorators", () => {
       handlers: [new MyHandlers()],
     });
 
-    expect(mockSubscribe).toHaveBeenCalledWith("workflow:order-flow:validate");
-    expect(mockSubscribe).toHaveBeenCalledWith("workflow:order-flow:charge");
+    const subscribedChannels = mockSubscribe.mock.calls.flat();
+    expect(subscribedChannels).toContain("workflow:order-flow:validate");
+    expect(subscribedChannels).toContain("workflow:order-flow:charge");
   });
 
   it("should support multiple handler classes", async () => {
@@ -219,8 +221,9 @@ describe("Synkro with decorators", () => {
       handlers: [new EventHandlers(), new WorkflowHandlers()],
     });
 
-    expect(mockSubscribe).toHaveBeenCalledWith("user:created");
-    expect(mockSubscribe).toHaveBeenCalledWith("workflow:order-flow:validate");
+    const subscribedChannels = mockSubscribe.mock.calls.flat();
+    expect(subscribedChannels).toContain("user:created");
+    expect(subscribedChannels).toContain("workflow:order-flow:validate");
   });
 
   it("should throw when a workflow step has no handler", async () => {
@@ -251,6 +254,10 @@ describe("Synkro with decorators", () => {
 
     instance.register(new MyHandlers());
 
-    expect(mockSubscribe).toHaveBeenCalledWith("late:event");
+    // Flush batched microtask subscribe
+    await Promise.resolve();
+
+    const subscribedChannels = mockSubscribe.mock.calls.flat();
+    expect(subscribedChannels).toContain("late:event");
   });
 });

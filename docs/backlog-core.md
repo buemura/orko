@@ -57,9 +57,8 @@ Failed events (after retry exhaustion) are only published to a `event:{type}:fai
 **Starting points:** `packages/core/src/synkro.ts`, `packages/core/src/types.ts`, transport interfaces
 Support publishing events on a schedule or with a delay (e.g., `synkro.schedule("cleanup:run", "0 */6 * * *")` or `synkro.publishDelayed(event, payload, delay)`). Needed for retries, timeouts, reminders, and saga-style workflows.
 
-### FT-03: Idempotency and deduplication support `[SEC]`
-**Starting points:** `packages/core/src/handlers/handler-registry.ts`, workflow state/cache design
-Prevents duplicate side effects in distributed/multi-instance scenarios. Current locks are in-process memory only (`processingLocks`), not cross-instance. **Security note:** Lack of cross-instance dedup can lead to repeated financial transactions, duplicate notifications, or replay attacks.
+### ~~FT-03: Idempotency and deduplication support `[SEC]`~~ ✅ Resolved in v0.9.0 (TD-03)
+Transport-level message dedup added to `RedisManager` using bounded in-memory cache keyed by `channel + requestId`. Handler and workflow registries also have distributed Redis locks (`setCacheIfNotExists`) for cross-instance dedup. Remaining risk: replay attacks with forged `requestId` values — mitigated by event schema validation (IMP-04).
 
 ### FT-06: Workflow timeout
 No timeout mechanism for workflows or individual steps. A step that hangs will leave the workflow in `running` state forever. Add `timeout` to `SynkroWorkflowStep` and `SynkroWorkflow`.
@@ -146,5 +145,5 @@ Support nesting workflows as steps within other workflows, enabling reusable wor
 |------|------|-------------|
 | TD-13 | High | Unvalidated `JSON.parse` on external input - DoS / injection vector |
 | IMP-04 | High | No payload schema validation - injection can propagate through handlers |
-| FT-03 | Medium | No cross-instance dedup - replay attacks / duplicate side effects |
+| ~~FT-03~~ | ~~Medium~~ | ✅ Resolved in v0.9.0 — transport-level dedup + distributed locks |
 | TD-08 | Medium | Silent fallback to Redis transport - unintended event exposure |

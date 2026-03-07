@@ -57,8 +57,9 @@ describe("Synkro", () => {
         ],
       });
 
-      // Workflow step should be registered as handler
-      expect(mockSubscribe).toHaveBeenCalledWith("workflow:my-workflow:step1");
+      // Workflow step should be registered as handler (batched with event channels)
+      const subscribedChannels = mockSubscribe.mock.calls.flat();
+      expect(subscribedChannels).toContain("workflow:my-workflow:step1");
     });
   });
 
@@ -71,7 +72,11 @@ describe("Synkro", () => {
       const handler = vi.fn();
       instance.on("order:placed", handler);
 
-      expect(mockSubscribe).toHaveBeenCalledWith("order:placed");
+      // Flush batched microtask subscribe
+      await Promise.resolve();
+
+      const subscribedChannels = mockSubscribe.mock.calls.flat();
+      expect(subscribedChannels).toContain("order:placed");
     });
   });
 

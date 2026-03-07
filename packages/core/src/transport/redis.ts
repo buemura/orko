@@ -8,7 +8,13 @@ export class RedisManager implements TransportManager {
   private publisher: Redis;
   private subscriber: Redis;
   private cacheClient: Redis;
-  private channelCallbacks: Map<string, (message: string) => void> = new Map();
+  private channelCallbacks: Map<string, Set<(message: string) => void>> =
+    new Map();
+  private pendingSubscriptions: string[] = [];
+  private flushScheduled = false;
+  private recentMessages = new Map<string, number>();
+  private static readonly DEDUP_WINDOW_MS = 5_000;
+  private static readonly MAX_RECENT_MESSAGES = 10_000;
 
   constructor(redisUrl: string) {
     this.publisher = new Redis(redisUrl);
@@ -16,9 +22,23 @@ export class RedisManager implements TransportManager {
     this.cacheClient = new Redis(redisUrl);
 
     this.subscriber.on("message", (channel: string, message: string) => {
-      const callback = this.channelCallbacks.get(channel);
-      if (callback) {
-        callback(message);
+      const requestId = this.extractRequestId(message);
+      const dedupeKey = requestId ? `${channel}\0${requestId}` : `${channel}\0${message}`;
+      const now = Date.now();
+
+      if (this.recentMessages.has(dedupeKey)) {
+        return;
+      }
+
+      this.recentMessages.set(dedupeKey, now);
+      this.evictStaleMessages(now);
+
+      const callbacks = this.channelCallbacks.get(channel);
+      if (callbacks) {
+        logger.debug(`[RedisManager] message on "${channel}" → ${callbacks.size} callback(s)`);
+        for (const callback of callbacks) {
+          callback(message);
+        }
       }
     });
   }
@@ -31,22 +51,53 @@ export class RedisManager implements TransportManager {
     channel: string,
     callback: (message: string) => void,
   ): void {
-    this.channelCallbacks.set(channel, callback);
+    const isNewChannel = !this.channelCallbacks.has(channel);
+
+    if (isNewChannel) {
+      this.channelCallbacks.set(channel, new Set());
+    }
+    this.channelCallbacks.get(channel)!.add(callback);
+    logger.debug(`[RedisManager] subscribeToChannel("${channel}") → now ${this.channelCallbacks.get(channel)!.size} callback(s)`);
+
+    if (isNewChannel) {
+      this.pendingSubscriptions.push(channel);
+      if (!this.flushScheduled) {
+        this.flushScheduled = true;
+        queueMicrotask(() => this.flushSubscriptions());
+      }
+    }
+  }
+
+  private flushSubscriptions(): void {
+    this.flushScheduled = false;
+    const channels = this.pendingSubscriptions.splice(0);
+    if (channels.length === 0) return;
 
     this.subscriber
-      .subscribe(channel)
+      .subscribe(...channels)
       .then((count) => {
         logger.debug(
-          `Subscribed to ${count} channel(s). Listening on "${channel}".`,
+          `Subscribed to ${count} channel(s): ${channels.join(", ")}`,
         );
       })
       .catch((err: unknown) => {
-        logger.error(`Failed to subscribe to channel ${channel}:`, err);
+        logger.error(`Failed to subscribe to channels:`, err);
       });
   }
 
   async getCache(key: string): Promise<string | null> {
     return await this.cacheClient.get(key);
+  }
+
+  async setCacheIfNotExists(
+    key: string,
+    value: string,
+    ttlSeconds?: number,
+  ): Promise<boolean> {
+    const result = ttlSeconds
+      ? await this.cacheClient.set(key, value, "EX", ttlSeconds, "NX")
+      : await this.cacheClient.set(key, value, "NX");
+    return result === "OK";
   }
 
   async setCache(
@@ -73,5 +124,22 @@ export class RedisManager implements TransportManager {
     await this.publisher.quit();
     await this.subscriber.quit();
     await this.cacheClient.quit();
+  }
+
+  private static readonly REQUEST_ID_RE = /"requestId":"([^"]+)"/;
+
+  private extractRequestId(message: string): string | null {
+    const match = RedisManager.REQUEST_ID_RE.exec(message);
+    return match?.[1] ?? null;
+  }
+
+  private evictStaleMessages(now: number): void {
+    if (this.recentMessages.size <= RedisManager.MAX_RECENT_MESSAGES) return;
+
+    for (const [key, timestamp] of this.recentMessages) {
+      if (now - timestamp > RedisManager.DEDUP_WINDOW_MS) {
+        this.recentMessages.delete(key);
+      }
+    }
   }
 }

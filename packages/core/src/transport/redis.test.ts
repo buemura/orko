@@ -41,15 +41,38 @@ describe("RedisManager", () => {
   });
 
   describe("subscribeToChannel", () => {
-    it("should subscribe to the channel", () => {
+    it("should batch-subscribe to channels via microtask", async () => {
       const callback = vi.fn();
       redis.subscribeToChannel("my-channel", callback);
+
+      // subscribe is batched via microtask, not called synchronously
+      expect(mockSubscribe).not.toHaveBeenCalled();
+
+      // Flush the microtask queue
+      await Promise.resolve();
+
       expect(mockSubscribe).toHaveBeenCalledWith("my-channel");
     });
 
-    it("should invoke callback when message arrives on matching channel", () => {
+    it("should batch multiple channels into a single subscribe call", async () => {
+      redis.subscribeToChannel("channel-a", vi.fn());
+      redis.subscribeToChannel("channel-b", vi.fn());
+      redis.subscribeToChannel("channel-c", vi.fn());
+
+      await Promise.resolve();
+
+      expect(mockSubscribe).toHaveBeenCalledTimes(1);
+      expect(mockSubscribe).toHaveBeenCalledWith(
+        "channel-a",
+        "channel-b",
+        "channel-c",
+      );
+    });
+
+    it("should invoke callback when message arrives on matching channel", async () => {
       const callback = vi.fn();
       redis.subscribeToChannel("my-channel", callback);
+      await Promise.resolve();
 
       // Capture the "message" event handler registered via `on`
       const onCall = mockOn.mock.calls.find(
@@ -66,9 +89,96 @@ describe("RedisManager", () => {
       expect(callback).toHaveBeenCalledWith("hello");
     });
 
-    it("should not invoke callback for a different channel", () => {
+    it("should fan out to multiple callbacks on the same channel", async () => {
+      const callback1 = vi.fn();
+      const callback2 = vi.fn();
+      redis.subscribeToChannel("my-channel", callback1);
+      redis.subscribeToChannel("my-channel", callback2);
+
+      await Promise.resolve();
+
+      // Redis subscribe should only be called once for the same channel
+      expect(mockSubscribe).toHaveBeenCalledTimes(1);
+
+      const onCall = mockOn.mock.calls.find(
+        (call) => call[0] === "message",
+      );
+      const messageHandler = onCall![1] as (
+        channel: string,
+        message: string,
+      ) => void;
+
+      messageHandler("my-channel", "hello");
+      expect(callback1).toHaveBeenCalledWith("hello");
+      expect(callback2).toHaveBeenCalledWith("hello");
+    });
+
+    it("should ignore duplicate messages on the same channel", async () => {
       const callback = vi.fn();
       redis.subscribeToChannel("my-channel", callback);
+      await Promise.resolve();
+
+      const onCall = mockOn.mock.calls.find(
+        (call) => call[0] === "message",
+      );
+      const messageHandler = onCall![1] as (
+        channel: string,
+        message: string,
+      ) => void;
+
+      messageHandler("my-channel", '{"requestId":"abc","payload":{}}');
+      messageHandler("my-channel", '{"requestId":"abc","payload":{}}');
+      messageHandler("my-channel", '{"requestId":"abc","payload":{}}');
+
+      expect(callback).toHaveBeenCalledTimes(1);
+    });
+
+    it("should ignore duplicate messages with same requestId but different payload", async () => {
+      const callback = vi.fn();
+      redis.subscribeToChannel("my-channel", callback);
+      await Promise.resolve();
+
+      const onCall = mockOn.mock.calls.find(
+        (call) => call[0] === "message",
+      );
+      const messageHandler = onCall![1] as (
+        channel: string,
+        message: string,
+      ) => void;
+
+      messageHandler("my-channel", '{"requestId":"abc","payload":{"v":1}}');
+      messageHandler("my-channel", '{"requestId":"abc","payload":{"v":2}}');
+
+      expect(callback).toHaveBeenCalledTimes(1);
+    });
+
+    it("should allow same message on different channels", async () => {
+      const callback1 = vi.fn();
+      const callback2 = vi.fn();
+      redis.subscribeToChannel("channel-a", callback1);
+      redis.subscribeToChannel("channel-b", callback2);
+      await Promise.resolve();
+
+      const onCall = mockOn.mock.calls.find(
+        (call) => call[0] === "message",
+      );
+      const messageHandler = onCall![1] as (
+        channel: string,
+        message: string,
+      ) => void;
+
+      const msg = '{"requestId":"abc","payload":{}}';
+      messageHandler("channel-a", msg);
+      messageHandler("channel-b", msg);
+
+      expect(callback1).toHaveBeenCalledTimes(1);
+      expect(callback2).toHaveBeenCalledTimes(1);
+    });
+
+    it("should not invoke callback for a different channel", async () => {
+      const callback = vi.fn();
+      redis.subscribeToChannel("my-channel", callback);
+      await Promise.resolve();
 
       const onCall = mockOn.mock.calls.find(
         (call) => call[0] === "message",
@@ -84,6 +194,22 @@ describe("RedisManager", () => {
   });
 
   describe("cache operations", () => {
+    it("should set a value only when key does not exist", async () => {
+      mockSet.mockResolvedValueOnce("OK");
+      const claimed = await redis.setCacheIfNotExists("key", "value", 60);
+
+      expect(claimed).toBe(true);
+      expect(mockSet).toHaveBeenCalledWith("key", "value", "EX", 60, "NX");
+    });
+
+    it("should return false when key already exists", async () => {
+      mockSet.mockResolvedValueOnce(null);
+      const claimed = await redis.setCacheIfNotExists("key", "value");
+
+      expect(claimed).toBe(false);
+      expect(mockSet).toHaveBeenCalledWith("key", "value", "NX");
+    });
+
     it("should get a cached value", async () => {
       mockGet.mockResolvedValue("cached-value");
       const result = await redis.getCache("key");

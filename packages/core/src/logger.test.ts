@@ -38,13 +38,13 @@ describe("Logger", () => {
   });
 
   describe("warn", () => {
-    it("should not log when debug is disabled", () => {
+    it("should always log regardless of debug flag", () => {
       setDebug(false);
       logger.warn("warning");
-      expect(warnSpy).not.toHaveBeenCalled();
+      expect(warnSpy).toHaveBeenCalledWith("warning");
     });
 
-    it("should log when debug is enabled", () => {
+    it("should log with debug enabled too", () => {
       setDebug(true);
       logger.warn("warning");
       expect(warnSpy).toHaveBeenCalledWith("warning");

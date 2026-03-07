@@ -13,8 +13,10 @@ function createMockRedis(): RedisManager {
     publishMessage: vi.fn(),
     subscribeToChannel: vi.fn(),
     getCache: vi.fn(),
+    setCacheIfNotExists: vi.fn().mockResolvedValue(true),
     setCache: vi.fn().mockResolvedValue(undefined),
     deleteCache: vi.fn(),
+    incrementCache: vi.fn().mockResolvedValue(1),
     disconnect: vi.fn(),
   } as unknown as RedisManager;
 }
@@ -267,6 +269,35 @@ describe("WorkflowRegistry", () => {
       );
 
       // Should not advance or publish
+      expect(mockRedis.publishMessage).not.toHaveBeenCalled();
+    });
+
+    it("should skip completion when distributed lock cannot be acquired", async () => {
+      const workflow = createTestWorkflow();
+      registry.registerWorkflows([workflow]);
+      vi.mocked(mockRedis.setCacheIfNotExists).mockResolvedValueOnce(false);
+
+      vi.mocked(mockRedis.getCache).mockResolvedValue(
+        JSON.stringify({
+          workflowName: "order-processing",
+          currentStep: 0,
+          status: "running",
+        }),
+      );
+
+      const subscribeCalls = vi.mocked(mockRedis.subscribeToChannel).mock.calls;
+      const validateCompletionCall = subscribeCalls.find(
+        (call) => call[0] === "event:workflow:order-processing:validate:completed",
+      );
+      const completionCallback = validateCompletionCall![1] as (
+        message: string,
+      ) => void;
+
+      completionCallback(
+        JSON.stringify({ requestId: "req-1", payload: { orderId: 42 } }),
+      );
+      await flushPromises();
+
       expect(mockRedis.publishMessage).not.toHaveBeenCalled();
     });
   });
@@ -721,6 +752,54 @@ describe("WorkflowRegistry", () => {
       );
     });
 
+    it("should trigger both onFailure and onComplete on failure", async () => {
+      const workflows: SynkroWorkflow[] = [
+        {
+          name: "process-order",
+          steps: [{ type: "validate", handler: vi.fn() }],
+          onFailure: "handle-error",
+          onComplete: "cleanup",
+        },
+        {
+          name: "handle-error",
+          steps: [{ type: "notify", handler: vi.fn() }],
+        },
+        {
+          name: "cleanup",
+          steps: [{ type: "clean", handler: vi.fn() }],
+        },
+      ];
+      registry.registerWorkflows(workflows);
+
+      vi.mocked(mockRedis.getCache).mockResolvedValue(
+        JSON.stringify({
+          workflowName: "process-order",
+          currentStep: 0,
+          status: "running",
+        }),
+      );
+
+      const subscribeCalls = vi.mocked(mockRedis.subscribeToChannel).mock.calls;
+      const failureCall = subscribeCalls.find(
+        (call) => call[0] === "event:workflow:process-order:validate:failed",
+      );
+      const failureCallback = failureCall![1] as (message: string) => void;
+
+      failureCallback(
+        JSON.stringify({ requestId: "req-1", payload: null }),
+      );
+      await flushPromises();
+
+      expect(mockRedis.publishMessage).toHaveBeenCalledWith(
+        "workflow:handle-error:notify",
+        JSON.stringify({ requestId: "req-1", payload: null }),
+      );
+      expect(mockRedis.publishMessage).toHaveBeenCalledWith(
+        "workflow:cleanup:clean",
+        JSON.stringify({ requestId: "req-1", payload: null }),
+      );
+    });
+
     it("should not trigger onSuccess when workflow fails", async () => {
       const workflows: SynkroWorkflow[] = [
         {
@@ -767,6 +846,126 @@ describe("WorkflowRegistry", () => {
         "workflow:start-shipment:ship",
         expect.any(String),
       );
+    });
+  });
+
+  describe("concurrent completion handling", () => {
+    it("should process only one completion when multiple arrive concurrently for the same step", async () => {
+      const workflow = createTestWorkflow();
+      registry.registerWorkflows([workflow]);
+
+      // First state read returns step 0 (running); subsequent reads return step 1
+      // so stale duplicate completions are ignored.
+      let stateReadCount = 0;
+      vi.mocked(mockRedis.getCache).mockImplementation(async (key: string) => {
+        if (key.startsWith("synkro:dedupe:")) {
+          return null;
+        }
+
+        stateReadCount += 1;
+        if (stateReadCount === 1) {
+          return JSON.stringify({
+            workflowName: "order-processing",
+            currentStep: 0,
+            status: "running",
+          });
+        }
+
+        return JSON.stringify({
+          workflowName: "order-processing",
+          currentStep: 1,
+          status: "running",
+        });
+      });
+
+      const subscribeCalls = vi.mocked(mockRedis.subscribeToChannel).mock.calls;
+      const validateCompletionCall = subscribeCalls.find(
+        (call) => call[0] === "event:workflow:order-processing:validate:completed",
+      );
+      const completionCallback = validateCompletionCall![1] as (
+        message: string,
+      ) => void;
+
+      const message = JSON.stringify({
+        requestId: "req-race",
+        payload: { orderId: 42 },
+      });
+
+      // Fire 3 concurrent completions for the same step
+      completionCallback(message);
+      completionCallback(message);
+      completionCallback(message);
+      await flushPromises();
+
+      // The next step should be published exactly once
+      const chargePublishes = vi
+        .mocked(mockRedis.publishMessage)
+        .mock.calls.filter(
+          (call) => call[0] === "workflow:order-processing:charge",
+        );
+      expect(chargePublishes).toHaveLength(1);
+    });
+
+    it("should process only one failure when multiple arrive concurrently for the same step", async () => {
+      const workflow: SynkroWorkflow = {
+        name: "simple-workflow",
+        steps: [
+          { type: "step1", handler: vi.fn() },
+          { type: "step2", handler: vi.fn() },
+        ],
+      };
+      registry.registerWorkflows([workflow]);
+
+      // First state read returns running; subsequent reads return failed so
+      // duplicate failures are ignored.
+      let stateReadCount = 0;
+      vi.mocked(mockRedis.getCache).mockImplementation(async (key: string) => {
+        if (key.startsWith("synkro:dedupe:")) {
+          return null;
+        }
+
+        stateReadCount += 1;
+        if (stateReadCount === 1) {
+          return JSON.stringify({
+            workflowName: "simple-workflow",
+            currentStep: 0,
+            status: "running",
+          });
+        }
+
+        return JSON.stringify({
+          workflowName: "simple-workflow",
+          currentStep: 0,
+          status: "failed",
+        });
+      });
+
+      const subscribeCalls = vi.mocked(mockRedis.subscribeToChannel).mock.calls;
+      const failureCall = subscribeCalls.find(
+        (call) => call[0] === "event:workflow:simple-workflow:step1:failed",
+      );
+      const failureCallback = failureCall![1] as (message: string) => void;
+
+      const message = JSON.stringify({
+        requestId: "req-race-fail",
+        payload: null,
+      });
+
+      // Fire 3 concurrent failures for the same step
+      failureCallback(message);
+      failureCallback(message);
+      failureCallback(message);
+      await flushPromises();
+
+      // State should be saved as failed exactly once
+      const failedStateSaves = vi
+        .mocked(mockRedis.setCache)
+        .mock.calls.filter(
+          (call) =>
+            call[0] === "workflow:state:req-race-fail:simple-workflow" &&
+            JSON.parse(call[1] as string).status === "failed",
+        );
+      expect(failedStateSaves).toHaveLength(1);
     });
   });
 });

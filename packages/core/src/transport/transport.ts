@@ -4,6 +4,11 @@ export interface TransportManager {
     channel: string,
     callback: (message: string) => void,
   ): void;
+  setCacheIfNotExists(
+    key: string,
+    value: string,
+    ttlSeconds?: number,
+  ): Promise<boolean>;
   getCache(key: string): Promise<string | null>;
   setCache(key: string, value: string, ttlSeconds?: number): Promise<void>;
   deleteCache(key: string): Promise<void>;

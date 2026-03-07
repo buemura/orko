@@ -10,6 +10,9 @@ type WorkflowState = {
   status: "running" | "completed" | "failed";
 };
 
+const PROCESSING_LOCK_TTL_SECONDS = 300;
+const DEDUPE_TTL_SECONDS = 86400;
+
 export class WorkflowRegistry {
   private workflows = new Map<string, SynkroWorkflow>();
   private branchTargets = new Map<string, Set<string>>();
@@ -18,7 +21,7 @@ export class WorkflowRegistry {
     { workflow: SynkroWorkflow; stepIndex: number }[]
   >();
   private processingLocks = new Set<string>();
-  private locks = new Map<string, Promise<void>>();
+  private lockQueues = new Map<string, Promise<void>>();
 
   constructor(
     private redis: TransportManager,
@@ -29,18 +32,19 @@ export class WorkflowRegistry {
     lockKey: string,
     fn: () => Promise<void>,
   ): Promise<void> {
-    while (this.locks.has(lockKey)) {
-      await this.locks.get(lockKey);
-    }
+    const prev = this.lockQueues.get(lockKey) ?? Promise.resolve();
     let resolve!: () => void;
-    const promise = new Promise<void>((r) => {
+    const current = new Promise<void>((r) => {
       resolve = r;
     });
-    this.locks.set(lockKey, promise);
+    this.lockQueues.set(lockKey, current);
     try {
+      await prev;
       await fn();
     } finally {
-      this.locks.delete(lockKey);
+      if (this.lockQueues.get(lockKey) === current) {
+        this.lockQueues.delete(lockKey);
+      }
       resolve();
     }
   }
@@ -151,7 +155,7 @@ export class WorkflowRegistry {
         `event:${channel}:completed`,
         (message: string) => {
           const { requestId } = JSON.parse(message) as { requestId: string };
-          this.withLock(`${requestId}:${workflow.name}`, () =>
+          void this.withLock(`${requestId}:${workflow.name}`, () =>
             this.handleStepCompletion(workflow, i, message),
           );
         },
@@ -161,7 +165,7 @@ export class WorkflowRegistry {
         `event:${channel}:failed`,
         (message: string) => {
           const { requestId } = JSON.parse(message) as { requestId: string };
-          this.withLock(`${requestId}:${workflow.name}`, () =>
+          void this.withLock(`${requestId}:${workflow.name}`, () =>
             this.handleStepFailure(workflow, i, message),
           );
         },
@@ -180,20 +184,15 @@ export class WorkflowRegistry {
     };
 
     const lockKey = `${requestId}:${workflow.name}:completion:${stepIndex}`;
-    if (this.processingLocks.has(lockKey)) {
-      return;
-    }
-    this.processingLocks.add(lockKey);
-
-    try {
+    await this.withStepTransitionClaim(lockKey, async () => {
       const state = await this.getState(requestId, workflow.name);
       if (!state || state.workflowName !== workflow.name || state.status !== "running") {
         return;
       }
 
       if (state.currentStep !== stepIndex) {
-        logger.warn(
-          `[WorkflowRegistry] - Step mismatch for "${workflow.name}" (requestId: ${requestId}): expected step ${state.currentStep}, got ${stepIndex}`,
+        logger.debug(
+          `[WorkflowRegistry] - Ignoring stale completion for "${workflow.name}" (requestId: ${requestId}): expected step ${state.currentStep}, got ${stepIndex}`,
         );
         return;
       }
@@ -232,9 +231,7 @@ export class WorkflowRegistry {
       }
 
       await this.routeToStep(workflow, requestId, nextStepIndex, payload);
-    } finally {
-      this.processingLocks.delete(lockKey);
-    }
+    });
   }
 
   private async handleStepFailure(
@@ -248,20 +245,15 @@ export class WorkflowRegistry {
     };
 
     const lockKey = `${requestId}:${workflow.name}:failure:${stepIndex}`;
-    if (this.processingLocks.has(lockKey)) {
-      return;
-    }
-    this.processingLocks.add(lockKey);
-
-    try {
+    await this.withStepTransitionClaim(lockKey, async () => {
       const state = await this.getState(requestId, workflow.name);
       if (!state || state.workflowName !== workflow.name || state.status !== "running") {
         return;
       }
 
       if (state.currentStep !== stepIndex) {
-        logger.warn(
-          `[WorkflowRegistry] - Step mismatch for "${workflow.name}" (requestId: ${requestId}): expected step ${state.currentStep}, got ${stepIndex}`,
+        logger.debug(
+          `[WorkflowRegistry] - Ignoring stale failure for "${workflow.name}" (requestId: ${requestId}): expected step ${state.currentStep}, got ${stepIndex}`,
         );
         return;
       }
@@ -287,9 +279,7 @@ export class WorkflowRegistry {
         `[WorkflowRegistry] - Workflow "${workflow.name}" failed at step "${currentStep.type}" (requestId: ${requestId})`,
       );
       await this.triggerNextWorkflows(workflow, "failed", requestId, payload);
-    } finally {
-      this.processingLocks.delete(lockKey);
-    }
+    });
   }
 
   private async routeToStep(
@@ -366,6 +356,61 @@ export class WorkflowRegistry {
 
   private stateKey(requestId: string, workflowName: string): string {
     return `workflow:state:${requestId}:${workflowName}`;
+  }
+
+  private async withStepTransitionClaim(
+    lockKey: string,
+    fn: () => Promise<void>,
+  ): Promise<void> {
+    if (this.processingLocks.has(lockKey)) {
+      return;
+    }
+
+    const dedupeKey = this.dedupeKey(lockKey);
+    const alreadyProcessed = await this.redis.getCache(dedupeKey);
+    if (alreadyProcessed === "1") {
+      logger.debug(
+        `[WorkflowRegistry] - Duplicate transition ignored (${lockKey})`,
+      );
+      return;
+    }
+
+    this.processingLocks.add(lockKey);
+
+    const distributedLockKey = this.distributedLockKey(lockKey);
+    let distributedLockAcquired = false;
+    let completed = false;
+
+    try {
+      distributedLockAcquired = await this.redis.setCacheIfNotExists(
+        distributedLockKey,
+        "1",
+        PROCESSING_LOCK_TTL_SECONDS,
+      );
+
+      if (!distributedLockAcquired) {
+        return;
+      }
+
+      await fn();
+      completed = true;
+    } finally {
+      this.processingLocks.delete(lockKey);
+      if (completed) {
+        await this.redis.setCache(dedupeKey, "1", DEDUPE_TTL_SECONDS);
+      }
+      if (distributedLockAcquired) {
+        await this.redis.deleteCache(distributedLockKey);
+      }
+    }
+  }
+
+  private distributedLockKey(lockKey: string): string {
+    return `synkro:lock:workflow:${lockKey}`;
+  }
+
+  private dedupeKey(lockKey: string): string {
+    return `synkro:dedupe:workflow:${lockKey}`;
   }
 
   private async saveState(

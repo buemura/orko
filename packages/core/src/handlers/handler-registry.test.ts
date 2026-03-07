@@ -11,9 +11,10 @@ function createMockRedis(): RedisManager {
     publishMessage: vi.fn(),
     subscribeToChannel: vi.fn(),
     getCache: vi.fn(),
-    setCache: vi.fn(),
+    setCacheIfNotExists: vi.fn().mockResolvedValue(true),
+    setCache: vi.fn().mockResolvedValue(undefined),
     deleteCache: vi.fn(),
-    incrementCache: vi.fn(),
+    incrementCache: vi.fn().mockResolvedValue(1),
     disconnect: vi.fn(),
   } as unknown as RedisManager;
 }
@@ -38,18 +39,62 @@ describe("HandlerRegistry", () => {
       );
     });
 
-    it("should overwrite handler if same event is registered twice", () => {
+    it("should accumulate handlers when same event is registered twice", () => {
       const handler1 = vi.fn();
       const handler2 = vi.fn();
 
       registry.register("event", handler1);
       registry.register("event", handler2);
 
-      expect(mockRedis.subscribeToChannel).toHaveBeenCalledTimes(2);
+      expect(mockRedis.subscribeToChannel).toHaveBeenCalledTimes(1);
+
+      const events = registry.getRegisteredEvents();
+      const eventEntries = events.filter((e) => e.type === "event");
+      expect(eventEntries).toHaveLength(2);
     });
   });
 
   describe("message handling", () => {
+    it("should skip processing when distributed lock cannot be acquired", async () => {
+      const handler = vi.fn();
+      vi.mocked(mockRedis.setCacheIfNotExists).mockResolvedValueOnce(false);
+      registry.register("user:created", handler);
+
+      const subscribeCall = vi.mocked(mockRedis.subscribeToChannel).mock
+        .calls[0]!;
+      const messageCallback = subscribeCall[1] as (message: string) => void;
+
+      await messageCallback(
+        JSON.stringify({
+          requestId: "req-locked",
+          payload: { name: "Alice" },
+        }),
+      );
+
+      expect(handler).not.toHaveBeenCalled();
+      expect(mockRedis.publishMessage).not.toHaveBeenCalled();
+    });
+
+    it("should skip already processed messages", async () => {
+      const handler = vi.fn();
+      vi.mocked(mockRedis.getCache).mockResolvedValueOnce("1");
+      registry.register("user:created", handler);
+
+      const subscribeCall = vi.mocked(mockRedis.subscribeToChannel).mock
+        .calls[0]!;
+      const messageCallback = subscribeCall[1] as (message: string) => void;
+
+      await messageCallback(
+        JSON.stringify({
+          requestId: "req-processed",
+          payload: { name: "Alice" },
+        }),
+      );
+
+      expect(handler).not.toHaveBeenCalled();
+      expect(mockRedis.publishMessage).not.toHaveBeenCalled();
+    });
+
     it("should invoke the handler when a message is received", async () => {
       const handler = vi.fn();
       registry.register("user:created", handler);
@@ -64,7 +109,8 @@ describe("HandlerRegistry", () => {
         payload: { name: "Alice" },
       });
 
-      await messageCallback(message);
+      messageCallback(message);
+      await flushPromises();
 
       expect(handler).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -96,6 +142,33 @@ describe("HandlerRegistry", () => {
           requestId: "req-123",
           payload: { name: "Alice" },
         }),
+      );
+    });
+
+    it("should invoke all handlers when multiple are registered for the same event", async () => {
+      const handler1 = vi.fn();
+      const handler2 = vi.fn();
+      registry.register("user:created", handler1);
+      registry.register("user:created", handler2);
+
+      // Both subscribeToChannel calls produce callbacks; simulate via the first one
+      const subscribeCall = vi.mocked(mockRedis.subscribeToChannel).mock
+        .calls[0]!;
+      const messageCallback = subscribeCall[1] as (message: string) => void;
+
+      const message = JSON.stringify({
+        requestId: "req-multi",
+        payload: { name: "Bob" },
+      });
+
+      messageCallback(message);
+      await flushPromises();
+
+      expect(handler1).toHaveBeenCalledWith(
+        expect.objectContaining({ requestId: "req-multi" }),
+      );
+      expect(handler2).toHaveBeenCalledWith(
+        expect.objectContaining({ requestId: "req-multi" }),
       );
     });
 
