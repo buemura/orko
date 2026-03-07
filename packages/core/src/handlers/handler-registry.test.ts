@@ -198,6 +198,7 @@ describe("HandlerRegistry", () => {
     });
 
     it("should publish a failure event after all retries are exhausted", async () => {
+      vi.useFakeTimers();
       const handler = vi.fn().mockRejectedValue(new Error("fail"));
       registry.register("user:created", handler, { maxRetries: 1 });
 
@@ -211,7 +212,8 @@ describe("HandlerRegistry", () => {
       });
 
       messageCallback(message);
-      await flushPromises();
+      await vi.advanceTimersByTimeAsync(0);
+      await vi.advanceTimersByTimeAsync(1000);
 
       expect(handler).toHaveBeenCalledTimes(2);
       expect(mockRedis.publishMessage).toHaveBeenCalledWith(
@@ -221,9 +223,11 @@ describe("HandlerRegistry", () => {
           payload: { name: "Alice" },
         }),
       );
+      vi.useRealTimers();
     });
 
     it("should not publish failure event if handler succeeds after retry", async () => {
+      vi.useFakeTimers();
       const handler = vi
         .fn()
         .mockRejectedValueOnce(new Error("fail"))
@@ -240,7 +244,8 @@ describe("HandlerRegistry", () => {
       });
 
       messageCallback(message);
-      await flushPromises();
+      await vi.advanceTimersByTimeAsync(0);
+      await vi.advanceTimersByTimeAsync(1000);
 
       expect(handler).toHaveBeenCalledTimes(2);
       expect(mockRedis.publishMessage).toHaveBeenCalledWith(
@@ -254,6 +259,7 @@ describe("HandlerRegistry", () => {
         "event:user:created:failed",
         expect.any(String),
       );
+      vi.useRealTimers();
     });
 
     it("should drop malformed JSON messages", async () => {
@@ -269,6 +275,208 @@ describe("HandlerRegistry", () => {
 
       expect(handler).not.toHaveBeenCalled();
       expect(mockRedis.publishMessage).not.toHaveBeenCalled();
+    });
+
+    it("should apply fixed delay between retries", async () => {
+      vi.useFakeTimers();
+      const handler = vi
+        .fn()
+        .mockRejectedValueOnce(new Error("fail"))
+        .mockResolvedValueOnce(undefined);
+      registry.register("user:created", handler, {
+        maxRetries: 1,
+        delayMs: 500,
+      });
+
+      const subscribeCall = vi.mocked(mockRedis.subscribeToChannel).mock
+        .calls[0]!;
+      const messageCallback = subscribeCall[1] as (message: string) => void;
+
+      const message = JSON.stringify({
+        requestId: "req-fixed",
+        payload: { name: "Alice" },
+      });
+
+      messageCallback(message);
+
+      // First attempt fails immediately
+      await vi.advanceTimersByTimeAsync(0);
+      expect(handler).toHaveBeenCalledTimes(1);
+
+      // Advance past the 500ms delay
+      await vi.advanceTimersByTimeAsync(500);
+      expect(handler).toHaveBeenCalledTimes(2);
+
+      vi.useRealTimers();
+    });
+
+    it("should apply exponential backoff between retries", async () => {
+      vi.useFakeTimers();
+      const handler = vi
+        .fn()
+        .mockRejectedValueOnce(new Error("fail"))
+        .mockRejectedValueOnce(new Error("fail"))
+        .mockResolvedValueOnce(undefined);
+      registry.register("user:created", handler, {
+        maxRetries: 2,
+        delayMs: 100,
+        backoff: "exponential",
+      });
+
+      const subscribeCall = vi.mocked(mockRedis.subscribeToChannel).mock
+        .calls[0]!;
+      const messageCallback = subscribeCall[1] as (message: string) => void;
+
+      const message = JSON.stringify({
+        requestId: "req-exp",
+        payload: {},
+      });
+
+      messageCallback(message);
+
+      // First attempt fails
+      await vi.advanceTimersByTimeAsync(0);
+      expect(handler).toHaveBeenCalledTimes(1);
+
+      // First retry: 100 * 2^0 = 100ms
+      await vi.advanceTimersByTimeAsync(100);
+      expect(handler).toHaveBeenCalledTimes(2);
+
+      // Second retry: 100 * 2^1 = 200ms
+      await vi.advanceTimersByTimeAsync(200);
+      expect(handler).toHaveBeenCalledTimes(3);
+
+      vi.useRealTimers();
+    });
+
+    it("should apply jitter to retry delay", async () => {
+      vi.useFakeTimers();
+      const mathRandomSpy = vi.spyOn(Math, "random").mockReturnValue(0.5);
+
+      const handler = vi
+        .fn()
+        .mockRejectedValueOnce(new Error("fail"))
+        .mockResolvedValueOnce(undefined);
+      registry.register("user:created", handler, {
+        maxRetries: 1,
+        delayMs: 1000,
+        jitter: true,
+      });
+
+      const subscribeCall = vi.mocked(mockRedis.subscribeToChannel).mock
+        .calls[0]!;
+      const messageCallback = subscribeCall[1] as (message: string) => void;
+
+      const message = JSON.stringify({
+        requestId: "req-jitter",
+        payload: {},
+      });
+
+      messageCallback(message);
+
+      // First attempt fails
+      await vi.advanceTimersByTimeAsync(0);
+      expect(handler).toHaveBeenCalledTimes(1);
+
+      // Jitter with Math.random()=0.5: 1000 * (0.5 + 0.5) = 1000ms
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(handler).toHaveBeenCalledTimes(2);
+
+      mathRandomSpy.mockRestore();
+      vi.useRealTimers();
+    });
+
+    it("should not retry when retryable predicate returns false", async () => {
+      const handler = vi
+        .fn()
+        .mockRejectedValue(new Error("non-retryable"));
+      registry.register("user:created", handler, {
+        maxRetries: 3,
+        retryable: (error) =>
+          error instanceof Error && error.message !== "non-retryable",
+      });
+
+      const subscribeCall = vi.mocked(mockRedis.subscribeToChannel).mock
+        .calls[0]!;
+      const messageCallback = subscribeCall[1] as (message: string) => void;
+
+      const message = JSON.stringify({
+        requestId: "req-noretry",
+        payload: {},
+      });
+
+      messageCallback(message);
+      await flushPromises();
+
+      // Should only attempt once — retryable returned false
+      expect(handler).toHaveBeenCalledTimes(1);
+      expect(mockRedis.publishMessage).toHaveBeenCalledWith(
+        "event:user:created:failed",
+        expect.any(String),
+      );
+    });
+
+    it("should retry when retryable predicate returns true", async () => {
+      vi.useFakeTimers();
+      const handler = vi
+        .fn()
+        .mockRejectedValueOnce(new Error("retryable"))
+        .mockResolvedValueOnce(undefined);
+      registry.register("user:created", handler, {
+        maxRetries: 1,
+        delayMs: 100,
+        retryable: () => true,
+      });
+
+      const subscribeCall = vi.mocked(mockRedis.subscribeToChannel).mock
+        .calls[0]!;
+      const messageCallback = subscribeCall[1] as (message: string) => void;
+
+      const message = JSON.stringify({
+        requestId: "req-retryable",
+        payload: {},
+      });
+
+      messageCallback(message);
+      await vi.advanceTimersByTimeAsync(0);
+      await vi.advanceTimersByTimeAsync(100);
+
+      expect(handler).toHaveBeenCalledTimes(2);
+
+      vi.useRealTimers();
+    });
+
+    it("should use default 1000ms delay when delayMs is not specified", async () => {
+      vi.useFakeTimers();
+      const handler = vi
+        .fn()
+        .mockRejectedValueOnce(new Error("fail"))
+        .mockResolvedValueOnce(undefined);
+      registry.register("user:created", handler, { maxRetries: 1 });
+
+      const subscribeCall = vi.mocked(mockRedis.subscribeToChannel).mock
+        .calls[0]!;
+      const messageCallback = subscribeCall[1] as (message: string) => void;
+
+      const message = JSON.stringify({
+        requestId: "req-default-delay",
+        payload: {},
+      });
+
+      messageCallback(message);
+
+      await vi.advanceTimersByTimeAsync(0);
+      expect(handler).toHaveBeenCalledTimes(1);
+
+      // Should not have retried yet at 999ms
+      await vi.advanceTimersByTimeAsync(999);
+      expect(handler).toHaveBeenCalledTimes(1);
+
+      // Should retry at 1000ms
+      await vi.advanceTimersByTimeAsync(1);
+      expect(handler).toHaveBeenCalledTimes(2);
+
+      vi.useRealTimers();
     });
 
     it("should drop messages with missing requestId", async () => {

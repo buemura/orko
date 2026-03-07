@@ -19,9 +19,8 @@ All `JSON.parse` calls in `HandlerRegistry` and `WorkflowRegistry` are now wrapp
 
 ## P1 - High
 
-### TD-01: No retry backoff strategy
-**File:** `packages/core/src/handlers/handler-registry.ts:105-142`
-Retries execute immediately with no delay between attempts, causing thundering-herd behavior under failure conditions. Should support exponential backoff, fixed delay, jitter, and predicate-based retryable error policy in `RetryConfig`.
+### ~~TD-01: No retry backoff strategy~~ ✅ Resolved in v0.10.0
+`RetryConfig` now supports `delayMs` (base delay, default 1000ms), `backoff` (`"fixed"` or `"exponential"`), `jitter` (randomized spread around the delay), and `retryable` (predicate to skip retries for non-retryable errors). Existing `maxRetries` behavior is preserved with a default 1s fixed delay.
 
 ### TD-04: Publish is fire-and-forget with no error handling
 **File:** `packages/core/src/transport/redis.ts:26-28`, `packages/core/src/transport/transport.ts`

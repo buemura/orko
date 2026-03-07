@@ -7,6 +7,7 @@ import type {
   HandlerCtx,
   HandlerFunction,
   PublishFunction,
+  RetryBackoffStrategy,
   RetryConfig,
 } from "../types.js";
 
@@ -14,6 +15,28 @@ type HandlerEntry = {
   handler: HandlerFunction;
   retry?: RetryConfig;
 };
+
+const DEFAULT_RETRY_DELAY_MS = 1000;
+
+function computeRetryDelay(
+  attempt: number,
+  backoff: RetryBackoffStrategy = "fixed",
+  baseDelayMs: number = DEFAULT_RETRY_DELAY_MS,
+  jitter: boolean = false,
+): number {
+  const delay =
+    backoff === "exponential"
+      ? baseDelayMs * Math.pow(2, attempt)
+      : baseDelayMs;
+
+  if (!jitter) return delay;
+
+  return Math.round(delay * (0.5 + Math.random()));
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 const PROCESSING_LOCK_TTL_SECONDS = 300;
 const DEDUPE_TTL_SECONDS = 86400;
@@ -211,13 +234,24 @@ export class HandlerRegistry {
         await entry.handler(ctx);
         return;
       } catch (error) {
-        if (attempt < maxRetries) {
-          logger.warn(
-            `[HandlerRegistry] - Handler "${eventType}" failed (attempt ${attempt + 1}/${maxRetries + 1}), retrying...`,
+        const isRetryable = entry.retry?.retryable
+          ? entry.retry.retryable(error)
+          : true;
+
+        if (attempt < maxRetries && isRetryable) {
+          const delay = computeRetryDelay(
+            attempt,
+            entry.retry?.backoff,
+            entry.retry?.delayMs,
+            entry.retry?.jitter,
           );
+          logger.warn(
+            `[HandlerRegistry] - Handler "${eventType}" failed (attempt ${attempt + 1}/${maxRetries + 1}), retrying in ${delay}ms...`,
+          );
+          await sleep(delay);
         } else {
           logger.error(
-            `[HandlerRegistry] - Handler "${eventType}" failed after ${maxRetries + 1} attempt(s): ${error}`,
+            `[HandlerRegistry] - Handler "${eventType}" failed after ${attempt + 1} attempt(s): ${error}`,
           );
           throw error;
         }

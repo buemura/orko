@@ -1,5 +1,11 @@
+export type RetryBackoffStrategy = "fixed" | "exponential";
+
 export type RetryConfig = {
   maxRetries: number;
+  delayMs?: number;
+  backoff?: RetryBackoffStrategy;
+  jitter?: boolean;
+  retryable?: (error: unknown) => boolean;
 };
 
 export type SynkroEvent = {
