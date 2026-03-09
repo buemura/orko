@@ -1,3 +1,5 @@
+import type { TransportManager } from "./transport/transport.js";
+
 export type SchemaValidator = (payload: unknown) => void;
 
 export type RetryBackoffStrategy = "fixed" | "exponential";
@@ -43,7 +45,7 @@ export type RetentionConfig = {
 };
 
 export type SynkroOptions = {
-  transport?: "redis" | "in-memory";
+  transport?: "redis" | "in-memory" | TransportManager;
   connectionUrl?: string;
   debug?: boolean;
   events?: SynkroEvent[];

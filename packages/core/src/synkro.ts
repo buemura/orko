@@ -47,7 +47,9 @@ export class Synkro {
     const logger = new Logger(options.debug ?? false);
 
     let transport: TransportManager;
-    if (options.transport === "in-memory") {
+    if (typeof options.transport === "object" && options.transport !== null) {
+      transport = options.transport;
+    } else if (options.transport === "in-memory") {
       transport = new InMemoryManager(logger);
     } else if (options.transport === "redis" || options.transport === undefined) {
       if (!options.connectionUrl) {
@@ -56,7 +58,7 @@ export class Synkro {
       transport = new RedisManager(options.connectionUrl);
     } else {
       throw new Error(
-        `[Synkro] - Invalid transport "${String(options.transport)}". Supported values: "redis", "in-memory"`,
+        `[Synkro] - Invalid transport "${String(options.transport)}". Supported values: "redis", "in-memory", or a TransportManager instance`,
       );
     }
 
