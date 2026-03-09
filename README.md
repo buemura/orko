@@ -1,8 +1,32 @@
-# Synkro
+<p align="center">
+  <img src="./assets/logo.svg" alt="Synkro" width="400" />
+</p>
 
-Lightweight event-driven workflow orchestrator for Node.js. Define standalone events and multi-step workflows with conditional branching, retries, and chaining — all via simple configuration.
+<p align="center">
+  <strong>Lightweight event-driven workflow orchestrator for Node.js</strong>
+</p>
+
+<p align="center">
+  <a href="https://www.npmjs.com/package/@synkro/core"><img src="https://img.shields.io/npm/v/@synkro/core?label=%40synkro%2Fcore&color=6366f1" alt="npm @synkro/core" /></a>
+  <a href="https://www.npmjs.com/package/@synkro/ui"><img src="https://img.shields.io/npm/v/@synkro/ui?label=%40synkro%2Fui&color=8b5cf6" alt="npm @synkro/ui" /></a>
+  <a href="https://www.npmjs.com/package/@synkro/nestjs"><img src="https://img.shields.io/npm/v/@synkro/nestjs?label=%40synkro%2Fnestjs&color=a78bfa" alt="npm @synkro/nestjs" /></a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/buemura/synkro/actions/workflows/ci.yml"><img src="https://github.com/buemura/synkro/actions/workflows/ci.yml/badge.svg?branch=master" alt="CI" /></a>
+  <a href="https://github.com/buemura/synkro/blob/master/LICENSE"><img src="https://img.shields.io/github/license/buemura/synkro?color=6366f1" alt="License" /></a>
+  <img src="https://img.shields.io/badge/node-%3E%3D18-8b5cf6" alt="Node.js >= 18" />
+  <a href="https://www.npmjs.com/package/@synkro/core"><img src="https://img.shields.io/npm/dm/@synkro/core?color=a78bfa" alt="Downloads" /></a>
+  <img src="https://img.shields.io/badge/TypeScript-strict-6366f1" alt="TypeScript" />
+</p>
+
+<br />
+
+Define standalone events and multi-step workflows with conditional branching, retries, and chaining — all via simple configuration.
 
 ![Dashboard](./packages/ui/docs/dashboard-screenshot.png)
+
+---
 
 ## Features
 
@@ -20,12 +44,12 @@ Lightweight event-driven workflow orchestrator for Node.js. Define standalone ev
 
 ## Packages
 
-| Package                           | Description                                           | Version |
-| --------------------------------- | ----------------------------------------------------- | ------- |
-| [@synkro/core](./packages/core)     | Core orchestrator with Redis and in-memory transports | [0.14.0](./release/v0.14.0.md)  |
-| [@synkro/ui](./packages/ui)         | Web dashboard for visualizing events and workflows    | [0.2.1](./release)              |
-| [@synkro/nestjs](./packages/nestjs) | NestJS integration module                             | [0.5.0](./release/nestjs-v0.5.0.md) |
-| [@synkro/next](./packages/nextjs)   | Next.js integration                                   | [0.1.1](./release)              |
+| Package                             | Description                                           | Version                                                                                                                 |
+| ----------------------------------- | ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| [@synkro/core](./packages/core)     | Core orchestrator with Redis and in-memory transports | [![npm](https://img.shields.io/npm/v/@synkro/core?color=6366f1&label=)](https://www.npmjs.com/package/@synkro/core)     |
+| [@synkro/ui](./packages/ui)         | Web dashboard for visualizing events and workflows    | [![npm](https://img.shields.io/npm/v/@synkro/ui?color=8b5cf6&label=)](https://www.npmjs.com/package/@synkro/ui)         |
+| [@synkro/nestjs](./packages/nestjs) | NestJS integration module                             | [![npm](https://img.shields.io/npm/v/@synkro/nestjs?color=a78bfa&label=)](https://www.npmjs.com/package/@synkro/nestjs) |
+| [@synkro/next](./packages/nextjs)   | Next.js integration                                   | [![npm](https://img.shields.io/npm/v/@synkro/next?color=c4b5fd&label=)](https://www.npmjs.com/package/@synkro/next)     |
 
 ## Quick Start
 
@@ -43,7 +67,7 @@ const synkro = await Synkro.start({
   drainTimeout: 5000, // graceful shutdown: wait up to 5s for active handlers
   schemas: {
     // global schema validation — throws at publish time
-    "UserSignedUp": (payload) => z.object({ email: z.string() }).parse(payload),
+    UserSignedUp: (payload) => z.object({ email: z.string() }).parse(payload),
   },
   events: [
     {
@@ -126,6 +150,26 @@ Click any workflow to see a branching flow diagram with SVG connectors and a det
 - **[@synkro/next](./packages/nextjs)** — Next.js integration with route handlers and dashboard
 - **[Examples](./examples)** — Working examples with Express, NestJS, and Next.js
 
+## Contributing
+
+Contributions are welcome! Please open an issue or submit a pull request.
+
+```bash
+# Clone and install
+git clone https://github.com/buemura/synkro.git
+cd synkro
+pnpm install
+
+# Build all packages
+pnpm build
+
+# Run tests
+pnpm test
+
+# Type check
+pnpm type-check
+```
+
 ## License
 
-ISC
+[ISC](./LICENSE) © [buemura](https://github.com/buemura)
