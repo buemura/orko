@@ -2,8 +2,6 @@ import { defineConfig } from "astro/config";
 import starlight from "@astrojs/starlight";
 
 export default defineConfig({
-  site: "https://buemura.github.io",
-  base: "/synkro",
   integrations: [
     starlight({
       title: "Synkro",
