@@ -6,7 +6,7 @@ export default defineConfig({
     starlight({
       title: "Synkro",
       logo: {
-        src: "./public/favicon.svg",
+        src: "./src/assets/mascot.svg",
       },
       social: {
         github: "https://github.com/buemura/synkro",
