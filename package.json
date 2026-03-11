@@ -1,6 +1,7 @@
 {
   "name": "synkro",
   "private": true,
+  "packageManager": "pnpm@9.15.9",
   "scripts": {
     "build": "pnpm --filter './packages/*' run build",
     "test": "pnpm --filter './packages/*' run test",
