@@ -9,6 +9,7 @@
 
 <p align="center">
   <a href="https://www.npmjs.com/package/@synkro/core"><img src="https://img.shields.io/npm/v/@synkro/core?label=%40synkro%2Fcore&color=6366f1" alt="npm @synkro/core" /></a>
+  <a href="https://www.npmjs.com/package/@synkro/agents"><img src="https://img.shields.io/npm/v/@synkro/agents?label=%40synkro%2Fagents&color=7c3aed" alt="npm @synkro/agents" /></a>
   <a href="https://www.npmjs.com/package/@synkro/ui"><img src="https://img.shields.io/npm/v/@synkro/ui?label=%40synkro%2Fui&color=8b5cf6" alt="npm @synkro/ui" /></a>
   <a href="https://www.npmjs.com/package/@synkro/nestjs"><img src="https://img.shields.io/npm/v/@synkro/nestjs?label=%40synkro%2Fnestjs&color=a78bfa" alt="npm @synkro/nestjs" /></a>
 </p>
@@ -23,7 +24,7 @@
 
 <br />
 
-Define standalone events and multi-step workflows with conditional branching, retries, and chaining — all via simple configuration.
+Define standalone events and multi-step workflows with conditional branching, retries, and chaining — all via simple configuration. Build LLM-powered AI agents with tools, memory, and multi-agent patterns on top of the same event-driven engine.
 
 ![Dashboard](./packages/ui/docs/dashboard-screenshot.png)
 
@@ -41,6 +42,9 @@ Define standalone events and multi-step workflows with conditional branching, re
 - **Workflow Timeout** — Step-level and workflow-level timeouts with automatic failure routing
 - **Graceful Shutdown** — Drain active handlers before disconnecting with configurable timeout
 - **Transport Options** — Redis for production, in-memory for development and testing
+- **AI Agents** — LLM-powered agents with ReAct loop, typed tool execution, and conversation memory
+- **Provider Agnostic** — Built-in adapters for OpenAI, Anthropic, and Gemini; implement `ModelProvider` for any LLM
+- **Agent ↔ Workflow Integration** — Bridge agents into Synkro events with `agent.asHandler()` for locking, dedup, and retries
 - **Dashboard UI** — Built-in web dashboard to visualize events, workflows, and message metrics
 - **TypeScript** — Full type support out of the box
 
@@ -48,10 +52,11 @@ Define standalone events and multi-step workflows with conditional branching, re
 
 | Package                             | Description                                           | Version                                                                                                                 |
 | ----------------------------------- | ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| [@synkro/core](./packages/core)     | Core orchestrator with Redis and in-memory transports | [![npm](https://img.shields.io/npm/v/@synkro/core?color=6366f1&label=)](https://www.npmjs.com/package/@synkro/core)     |
-| [@synkro/ui](./packages/ui)         | Web dashboard for visualizing events and workflows    | [![npm](https://img.shields.io/npm/v/@synkro/ui?color=8b5cf6&label=)](https://www.npmjs.com/package/@synkro/ui)         |
-| [@synkro/nestjs](./packages/nestjs) | NestJS integration module                             | [![npm](https://img.shields.io/npm/v/@synkro/nestjs?color=a78bfa&label=)](https://www.npmjs.com/package/@synkro/nestjs) |
-| [@synkro/next](./packages/nextjs)   | Next.js integration                                   | [![npm](https://img.shields.io/npm/v/@synkro/next?color=c4b5fd&label=)](https://www.npmjs.com/package/@synkro/next)     |
+| [@synkro/core](./packages/core)       | Core orchestrator with Redis and in-memory transports        | [![npm](https://img.shields.io/npm/v/@synkro/core?color=6366f1&label=)](https://www.npmjs.com/package/@synkro/core)       |
+| [@synkro/agents](./packages/agents)   | AI agent orchestration with tools, memory, and multi-agent patterns | [![npm](https://img.shields.io/npm/v/@synkro/agents?color=7c3aed&label=)](https://www.npmjs.com/package/@synkro/agents) |
+| [@synkro/ui](./packages/ui)           | Web dashboard for visualizing events and workflows           | [![npm](https://img.shields.io/npm/v/@synkro/ui?color=8b5cf6&label=)](https://www.npmjs.com/package/@synkro/ui)           |
+| [@synkro/nestjs](./packages/nestjs)   | NestJS integration module                                    | [![npm](https://img.shields.io/npm/v/@synkro/nestjs?color=a78bfa&label=)](https://www.npmjs.com/package/@synkro/nestjs)   |
+| [@synkro/next](./packages/nextjs)     | Next.js integration                                          | [![npm](https://img.shields.io/npm/v/@synkro/next?color=c4b5fd&label=)](https://www.npmjs.com/package/@synkro/next)       |
 
 ## Quick Start
 
@@ -144,13 +149,64 @@ Click any workflow to see a branching flow diagram with SVG connectors and a det
 
 ![Workflow Detail](./packages/ui/docs/workflow-detail-screenshot.png)
 
+## AI Agents
+
+Install `@synkro/agents` to build LLM-powered agents that integrate directly with Synkro's event system.
+
+```bash
+npm install @synkro/agents @synkro/core
+```
+
+```ts
+import { Synkro } from "@synkro/core";
+import { createAgent, createTool, OpenAIProvider } from "@synkro/agents";
+
+const searchTool = createTool({
+  name: "web_search",
+  description: "Search the web for information",
+  parameters: {
+    type: "object",
+    properties: { query: { type: "string" } },
+    required: ["query"],
+  },
+  async execute(input) {
+    return fetch(`https://api.search.com?q=${input.query}`).then((r) => r.json());
+  },
+});
+
+const agent = createAgent({
+  name: "support-agent",
+  systemPrompt: "You answer customer support questions.",
+  provider: new OpenAIProvider({ apiKey: process.env.OPENAI_API_KEY! }),
+  model: { model: "gpt-4o" },
+  tools: [searchTool],
+  maxIterations: 5,
+});
+
+// Use standalone
+const result = await agent.run("What are the latest trends in AI?");
+console.log(result.output);
+
+// Or bridge into Synkro's event system with full locking, dedup, and retries
+const synkro = await Synkro.start({
+  transport: "redis",
+  connectionUrl: "redis://localhost:6379",
+  events: [{ type: "support:request", handler: agent.asHandler() }],
+});
+
+await synkro.publish("support:request", { input: "Where is my order #12345?" });
+```
+
+Built-in adapters for **OpenAI**, **Anthropic**, and **Gemini** — or implement the `ModelProvider` interface for any LLM.
+
 ## Documentation
 
 - **[@synkro/core](./packages/core)** — Full API reference, workflow configuration, conditional routing, chaining, and retry
+- **[@synkro/agents](./packages/agents)** — AI agent orchestration, tools, memory, providers, and multi-agent patterns
 - **[@synkro/ui](./packages/ui)** — Dashboard setup, served routes, and configuration options
 - **[@synkro/nestjs](./packages/nestjs)** — NestJS module registration and usage
 - **[@synkro/next](./packages/nextjs)** — Next.js integration with route handlers and dashboard
-- **[Examples](./examples)** — Working examples with Express, NestJS, and Next.js
+- **[Examples](./examples)** — Working examples with Express, NestJS, Next.js, and AI Agents
 
 ## Contributing
 
