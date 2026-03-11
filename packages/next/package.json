@@ -1,6 +1,6 @@
 {
   "name": "@synkro/next",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Next.js integration for @synkro/core",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -33,12 +33,13 @@
   "license": "ISC",
   "repository": {
     "type": "git",
-    "url": "https://github.com/buemura/synkro.git"
+    "url": "https://github.com/buemura/synkro.git",
+    "directory": "packages/next"
   },
-  "homepage": "https://github.com/buemura/synkro/packages/next#readme",
+  "homepage": "https://github.com/buemura/synkro",
   "peerDependencies": {
-    "@synkro/core": "^0.16.0",
-    "@synkro/ui": "^0.2.1",
+    "@synkro/core": "^0.18.1",
+    "@synkro/ui": "^0.2.3",
     "ioredis": "^5.0.0",
     "next": "^14.0.0 || ^15.0.0 || ^16.0.0"
   },

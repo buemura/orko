@@ -1,6 +1,6 @@
 {
   "name": "@synkro/nestjs",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "NestJS integration module for @synkro/core",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -32,13 +32,14 @@
   "license": "ISC",
   "repository": {
     "type": "git",
-    "url": "https://github.com/buemura/synkro.git"
+    "url": "https://github.com/buemura/synkro.git",
+    "directory": "packages/nestjs"
   },
-  "homepage": "https://github.com/buemura/synkro/packages/nestjs#readme",
+  "homepage": "https://github.com/buemura/synkro",
   "peerDependencies": {
     "@nestjs/common": "^10.0.0 || ^11.0.0",
     "@nestjs/core": "^10.0.0 || ^11.0.0",
-    "@synkro/core": "^0.15.0",
+    "@synkro/core": "^0.18.1",
     "reflect-metadata": "^0.1.13 || ^0.2.0"
   },
   "devDependencies": {
