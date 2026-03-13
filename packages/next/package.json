@@ -1,6 +1,6 @@
 {
   "name": "@synkro/next",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Next.js integration for @synkro/core",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -38,8 +38,8 @@
   },
   "homepage": "https://github.com/buemura/synkro",
   "peerDependencies": {
-    "@synkro/core": "^0.18.1",
-    "@synkro/ui": "^0.2.3",
+    "@synkro/core": "^0.19.0",
+    "@synkro/ui": "^0.2.4",
     "ioredis": "^5.0.0",
     "next": "^14.0.0 || ^15.0.0 || ^16.0.0"
   },
