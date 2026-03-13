@@ -18,6 +18,7 @@ export type AgentConfig = {
   retry?: RetryConfig | undefined;
   onTokenUsage?: ((usage: TokenUsage) => void) | undefined;
   registry?: AgentRegistry | undefined;
+  emitEvents?: boolean | undefined;
 };
 
 export type AgentRunOptions = {

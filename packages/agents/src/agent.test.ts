@@ -592,4 +592,147 @@ describe("Agent", () => {
       expect(result.toolCalls[0]!.error).toContain("no agent registry");
     });
   });
+
+  describe("emitEvents", () => {
+    it("should publish agent:run:started and agent:run:completed on successful run", async () => {
+      const publishSpy = vi.fn(async () => "event-id");
+
+      const provider = createMockProvider([
+        { content: "Done", usage: USAGE, finishReason: "stop" },
+      ]);
+
+      const agent = new Agent({
+        name: "emit-agent",
+        systemPrompt: "Test.",
+        provider,
+        model: { model: "test-model" },
+        emitEvents: true,
+      });
+
+      const handler = agent.asHandler();
+      await handler({
+        requestId: "req-emit",
+        payload: { input: "hello" },
+        publish: publishSpy,
+        setPayload: vi.fn(),
+      });
+
+      expect(publishSpy).toHaveBeenCalledWith("agent:run:started", {
+        agentName: "emit-agent",
+        runId: "req-emit",
+      });
+
+      expect(publishSpy).toHaveBeenCalledWith("agent:run:completed", expect.objectContaining({
+        agentName: "emit-agent",
+        runId: "req-emit",
+        status: "completed",
+        toolCallCount: 0,
+      }));
+    });
+
+    it("should publish agent:tool:executed for each tool call", async () => {
+      const publishSpy = vi.fn(async () => "event-id");
+
+      const addTool: Tool<{ a: number }, number> = {
+        name: "add",
+        description: "Add",
+        parameters: { type: "object", properties: { a: { type: "number" } }, required: ["a"] },
+        execute: async (input) => input.a + 1,
+      };
+
+      const provider = createMockProvider([
+        {
+          content: "",
+          toolCalls: [{ id: "tc-1", name: "add", arguments: '{"a": 5}' }],
+          usage: USAGE,
+          finishReason: "tool_calls",
+        },
+        { content: "Result is 6", usage: USAGE, finishReason: "stop" },
+      ]);
+
+      const agent = new Agent({
+        name: "tool-emit-agent",
+        systemPrompt: "Test.",
+        provider,
+        model: { model: "test-model" },
+        tools: [addTool],
+        emitEvents: true,
+      });
+
+      const handler = agent.asHandler();
+      await handler({
+        requestId: "req-tool",
+        payload: { input: "add" },
+        publish: publishSpy,
+        setPayload: vi.fn(),
+      });
+
+      expect(publishSpy).toHaveBeenCalledWith("agent:tool:executed", expect.objectContaining({
+        agentName: "tool-emit-agent",
+        runId: "req-tool",
+        toolName: "add",
+        durationMs: expect.any(Number),
+      }));
+    });
+
+    it("should publish agent:run:failed when LLM throws", async () => {
+      const publishSpy = vi.fn(async () => "event-id");
+
+      const provider: ModelProvider = {
+        chat: vi.fn(async () => {
+          throw new Error("API error");
+        }),
+      };
+
+      const agent = new Agent({
+        name: "fail-emit-agent",
+        systemPrompt: "Test.",
+        provider,
+        model: { model: "test-model" },
+        emitEvents: true,
+      });
+
+      const handler = agent.asHandler();
+      await handler({
+        requestId: "req-fail",
+        payload: { input: "test" },
+        publish: publishSpy,
+        setPayload: vi.fn(),
+      });
+
+      expect(publishSpy).toHaveBeenCalledWith("agent:run:failed", {
+        agentName: "fail-emit-agent",
+        runId: "req-fail",
+        error: "API error",
+      });
+    });
+
+    it("should not publish events when emitEvents is false (default)", async () => {
+      const publishSpy = vi.fn(async () => "event-id");
+
+      const provider = createMockProvider([
+        { content: "Done", usage: USAGE, finishReason: "stop" },
+      ]);
+
+      const agent = new Agent({
+        name: "no-emit-agent",
+        systemPrompt: "Test.",
+        provider,
+        model: { model: "test-model" },
+      });
+
+      const handler = agent.asHandler();
+      await handler({
+        requestId: "req-no-emit",
+        payload: { input: "hello" },
+        publish: publishSpy,
+        setPayload: vi.fn(),
+      });
+
+      expect(publishSpy).not.toHaveBeenCalledWith(
+        expect.stringMatching(/^agent:/),
+        expect.anything(),
+      );
+    });
+  });
 });

@@ -6,6 +6,10 @@ export { createAgent, createTool, createAgentRegistry } from "./factories.js";
 // Orchestration
 export { createPipeline } from "./orchestration/pipeline.js";
 export type { AgentStep, PipelineConfig } from "./orchestration/pipeline.js";
+export { createRouter } from "./orchestration/router.js";
+export type { Route, RouterConfig } from "./orchestration/router.js";
+export { createSupervisor } from "./orchestration/supervisor.js";
+export type { SupervisorConfig } from "./orchestration/supervisor.js";
 
 // LLM
 export type { ModelProvider } from "./llm/provider.js";

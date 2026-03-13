@@ -25,6 +25,7 @@ export class Agent {
   private readonly tokenBudget: number | undefined;
   private readonly onTokenUsage: ((usage: TokenUsage) => void) | undefined;
   private readonly registry: AgentRegistry | undefined;
+  private readonly emitEvents: boolean;
 
   constructor(config: AgentConfig) {
     this.name = config.name;
@@ -37,6 +38,7 @@ export class Agent {
     this.tokenBudget = config.tokenBudget;
     this.onTokenUsage = config.onTokenUsage;
     this.registry = config.registry;
+    this.emitEvents = config.emitEvents ?? false;
 
     this.toolRegistry = new ToolRegistry();
     if (config.tools) {
@@ -49,6 +51,7 @@ export class Agent {
 
   async run(input: string, options?: AgentRunOptions): Promise<AgentRunResult> {
     const runId = options?.requestId ?? randomUUID();
+    const startMs = Date.now();
     const allToolResults: ToolResult[] = [];
     const totalUsage: TokenUsage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
 
@@ -74,6 +77,10 @@ export class Agent {
     // Build AgentContext for tool execution (with live synkro context when available)
     const ctx = this.buildContext(runId, options?.payload, totalUsage, options?.synkroCtx);
 
+    if (this.emitEvents) {
+      await ctx.publish("agent:run:started", { agentName: this.name, runId });
+    }
+
     let iterations = 0;
 
     while (iterations < this.maxIterations) {
@@ -81,7 +88,18 @@ export class Agent {
 
       // Check token budget before calling LLM
       if (this.tokenBudget && totalUsage.totalTokens >= this.tokenBudget) {
-        return this.buildResult(runId, messages, allToolResults, totalUsage, "token_budget_exceeded");
+        const result = this.buildResult(runId, messages, allToolResults, totalUsage, "token_budget_exceeded");
+        if (this.emitEvents) {
+          await ctx.publish("agent:run:completed", {
+            agentName: this.name,
+            runId,
+            status: result.status,
+            tokenUsage: result.tokenUsage,
+            toolCallCount: result.toolCalls.length,
+            durationMs: Date.now() - startMs,
+          });
+        }
+        return result;
       }
 
       let response;
@@ -89,7 +107,7 @@ export class Agent {
         response = await this.provider.chat(messages, modelOptions);
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
-        return this.buildResult(
+        const result = this.buildResult(
           runId,
           messages,
           allToolResults,
@@ -97,6 +115,14 @@ export class Agent {
           "failed",
           `LLM call failed: ${errorMessage}`,
         );
+        if (this.emitEvents) {
+          await ctx.publish("agent:run:failed", {
+            agentName: this.name,
+            runId,
+            error: errorMessage,
+          });
+        }
+        return result;
       }
 
       // Accumulate token usage
@@ -126,12 +152,35 @@ export class Agent {
           await this.memory.addMessage(this.name, runId, assistantMessage);
         }
 
-        return this.buildResult(runId, messages, allToolResults, totalUsage, "completed");
+        const result = this.buildResult(runId, messages, allToolResults, totalUsage, "completed");
+        if (this.emitEvents) {
+          await ctx.publish("agent:run:completed", {
+            agentName: this.name,
+            runId,
+            status: result.status,
+            tokenUsage: result.tokenUsage,
+            toolCallCount: result.toolCalls.length,
+            durationMs: Date.now() - startMs,
+          });
+        }
+        return result;
       }
 
       // Execute tool calls
       const toolResults = await this.toolExecutor.executeAll(response.toolCalls, ctx);
       allToolResults.push(...toolResults);
+
+      if (this.emitEvents) {
+        for (const r of toolResults) {
+          await ctx.publish("agent:tool:executed", {
+            agentName: this.name,
+            runId,
+            toolName: r.name,
+            durationMs: r.durationMs,
+            ...(r.error && { error: r.error }),
+          });
+        }
+      }
 
       // Append tool results as messages
       for (const result of toolResults) {
@@ -148,7 +197,18 @@ export class Agent {
     }
 
     // Exhausted max iterations
-    return this.buildResult(runId, messages, allToolResults, totalUsage, "max_iterations");
+    const result = this.buildResult(runId, messages, allToolResults, totalUsage, "max_iterations");
+    if (this.emitEvents) {
+      await ctx.publish("agent:run:completed", {
+        agentName: this.name,
+        runId,
+        status: result.status,
+        tokenUsage: result.tokenUsage,
+        toolCallCount: result.toolCalls.length,
+        durationMs: Date.now() - startMs,
+      });
+    }
+    return result;
   }
 
   /**

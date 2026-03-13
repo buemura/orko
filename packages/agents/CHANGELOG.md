@@ -6,6 +6,14 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-03-11
+
+### Added
+
+- **Observability (D4)** — Agents can now emit structured lifecycle events into the synkro event system. Enable with `emitEvents: true` in `AgentConfig`. Emitted events: `agent:run:started`, `agent:run:completed`, `agent:run:failed`, `agent:tool:executed`. Events are no-ops in standalone mode (no synkro context).
+- **Dynamic Router (D5)** — `createRouter()` provides LLM-based N-path workflow branching. The router presents named routes to the LLM (JSON mode, temperature 0), selects the best route, and publishes the selected route name as a synkro event with the current payload. Supports a configurable `fallback` route for uncertain cases.
+- **Supervisor/Worker Pattern (D6)** — `createSupervisor()` creates an agent that delegates tasks to specialized worker agents via a synthetic `delegate_to_worker` tool. The supervisor iterates (reason → delegate → observe) until the task is complete. `maxRounds` defaults to 5 and maps directly to the underlying agent's `maxIterations`. Built entirely on existing Agent primitives.
+
 ## [0.2.1] - 2026-03-11
 
 ### Changed
