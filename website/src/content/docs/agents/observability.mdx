@@ -1,0 +1,74 @@
+---
+title: Observability
+description: Monitor agent lifecycle events — started, completed, failed, and tool executions.
+sidebar:
+  order: 7
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+Agents can emit structured lifecycle events into Synkro's event system, enabling monitoring, logging, and reactive workflows based on agent activity.
+
+## Enabling events
+
+Set `emitEvents: true` in the agent configuration:
+
+```ts
+import { createAgent, OpenAIProvider } from "@synkro/agents";
+
+const agent = createAgent({
+  name: "support-agent",
+  systemPrompt: "You are a helpful support agent.",
+  provider: new OpenAIProvider({ apiKey: process.env.OPENAI_API_KEY! }),
+  model: { model: "gpt-4o" },
+  emitEvents: true,
+});
+```
+
+## Event types
+
+| Event | When emitted | Payload fields |
+|---|---|---|
+| `agent:run:started` | Agent run begins | `agentName`, `runId` |
+| `agent:run:completed` | Agent run finishes (any terminal status) | `agentName`, `runId`, `status`, `tokenUsage`, `toolCallCount`, `durationMs` |
+| `agent:run:failed` | LLM call throws an error | `agentName`, `runId`, `error` |
+| `agent:tool:executed` | A tool finishes executing | `agentName`, `runId`, `toolName`, `durationMs`, `error?` |
+
+## Subscribing to events
+
+Listen to agent events with `synkro.on()` like any other Synkro event:
+
+```ts
+synkro.on("agent:run:completed", async (ctx) => {
+  const { agentName, status, durationMs, tokenUsage } = ctx.payload;
+  console.log(`${agentName} finished with status "${status}" in ${durationMs}ms`);
+  console.log(`Tokens used: ${tokenUsage.totalTokens}`);
+});
+
+synkro.on("agent:tool:executed", async (ctx) => {
+  const { agentName, toolName, durationMs, error } = ctx.payload;
+  if (error) {
+    console.error(`${agentName} tool "${toolName}" failed: ${error}`);
+  }
+});
+```
+
+## Requirements
+
+<Aside type="caution">
+Events are only published when the agent has a live Synkro context — either through `agent.asHandler()` or by passing `synkroCtx` in `AgentRunOptions`. Without a Synkro context, `emitEvents` is a no-op.
+</Aside>
+
+```ts
+// Option 1: use asHandler() — synkro context is provided automatically
+synkro.on("support-request", agent.asHandler());
+
+// Option 2: pass synkroCtx manually
+const result = await agent.run("Help me", {
+  synkroCtx: handlerContext,
+});
+```
+
+<Aside type="tip">
+Combine observability events with [Middleware](/core/middleware) to build centralized agent telemetry — for example, logging all agent runs to an external monitoring service.
+</Aside>

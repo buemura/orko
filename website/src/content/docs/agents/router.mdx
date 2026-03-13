@@ -1,0 +1,81 @@
+---
+title: Dynamic Router
+description: LLM-based N-path routing for classifying inputs and branching workflows.
+sidebar:
+  order: 8
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+`createRouter()` creates an LLM-powered classifier that selects one of N named routes based on the input. The selected route name is published as a Synkro event, enabling downstream handlers to react.
+
+## Creating a router
+
+```ts
+import { createRouter, OpenAIProvider } from "@synkro/agents";
+
+const router = createRouter({
+  name: "ticket-router",
+  provider: new OpenAIProvider({ apiKey: process.env.OPENAI_API_KEY! }),
+  model: { model: "gpt-4o-mini" },
+  routes: [
+    { name: "billing", description: "Billing issues: charges, refunds, invoices" },
+    { name: "technical", description: "Technical issues: errors, bugs, crashes" },
+    { name: "general", description: "General questions and feedback" },
+  ],
+  fallback: "general",
+});
+```
+
+## RouterConfig
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `name` | `string` | Yes | Router identifier. |
+| `provider` | `ModelProvider` | Yes | LLM provider instance. |
+| `model` | `ModelOptions` | Yes | Model configuration (model name, etc.). |
+| `routes` | `Route[]` | Yes | Available routes with name and description. |
+| `systemPrompt` | `string` | No | Override the default routing system prompt. |
+| `fallback` | `string` | No | Route name to use when the LLM response cannot be parsed or the route is not recognized. |
+
+Each `Route` has:
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `name` | `string` | Yes | Unique route identifier — published as the event type. |
+| `description` | `string` | Yes | Describes when this route should be selected (shown to the LLM). |
+| `handler` | `HandlerFunction` | No | Optional handler for direct invocation. |
+
+## Using as a Synkro handler
+
+Call `router.asHandler()` to get a handler function for Synkro events. The router reads `ctx.payload.input` (or stringifies the full payload), classifies it, and publishes the selected route name as a new event:
+
+```ts
+const synkro = await Synkro.start({
+  transport: "redis",
+  connectionUrl: "redis://localhost:6379",
+  events: [
+    { type: "classify-ticket", handler: router.asHandler() },
+    { type: "billing", handler: billingHandler },
+    { type: "technical", handler: technicalHandler },
+    { type: "general", handler: generalHandler },
+  ],
+});
+
+await synkro.publish("classify-ticket", { input: "I was charged twice" });
+// Router selects "billing" → publishes "billing" event with the original payload
+```
+
+## Fallback route
+
+If the LLM response cannot be parsed as JSON or the selected route name is not recognized, the router falls back to the `fallback` route.
+
+<Aside type="caution">
+If no `fallback` is configured and the LLM response cannot be resolved to a valid route, the router throws an error.
+</Aside>
+
+## How routing works
+
+1. The LLM receives a system prompt listing all available routes and their descriptions.
+2. The LLM is called with `temperature: 0` and must respond with `{"route": "<route_name>"}`.
+3. The router validates the response, applies the fallback if needed, and publishes the selected route name as a Synkro event.

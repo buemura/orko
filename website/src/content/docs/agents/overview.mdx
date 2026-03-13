@@ -27,6 +27,9 @@ import { Aside, Steps } from '@astrojs/starlight/components';
 | **Synkro integration** | `agent.asHandler()` turns any agent into an event handler or workflow step. |
 | **Token tracking** | Cumulative token usage per run with optional budget limits and callbacks. |
 | **Safety guardrails** | `maxIterations` and `tokenBudget` prevent runaway agents. |
+| **Observability** | Agents emit lifecycle events (started, completed, tool executed) to Synkro's event system. |
+| **Dynamic Router** | LLM-based N-path branching for classifying and routing inputs to different handlers. |
+| **Supervisor / Worker** | Delegate tasks to specialized worker agents with configurable delegation rounds. |
 | **Zero dependencies** | Uses `fetch` for HTTP — no SDK packages to install. |
 
 ## Installation
@@ -89,4 +92,7 @@ Agents work standalone or plugged into Synkro. See [Synkro Integration](/agents/
 - [Providers](/agents/providers) — use OpenAI, Anthropic, Gemini, or bring your own.
 - [Memory](/agents/memory) — persist conversations across runs.
 - [Synkro Integration](/agents/synkro-integration) — run agents as event handlers and workflow steps.
+- [Observability](/agents/observability) — monitor agent lifecycle events.
+- [Dynamic Router](/agents/router) — LLM-based dynamic routing for N-path branching.
+- [Supervisor / Worker](/agents/supervisor) — delegate tasks to specialized worker agents.
 - [API Reference](/agents/api-reference) — complete type and function reference.

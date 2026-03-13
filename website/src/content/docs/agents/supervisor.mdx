@@ -1,0 +1,87 @@
+---
+title: Supervisor / Worker
+description: Delegate tasks to specialized worker agents using the supervisor pattern.
+sidebar:
+  order: 9
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+`createSupervisor()` creates a supervisor agent that delegates tasks to a pool of specialized worker agents. The supervisor reasons about what work to delegate, calls workers via a synthetic tool, and synthesizes results.
+
+## Creating a supervisor
+
+```ts
+import { createAgent, createSupervisor, OpenAIProvider } from "@synkro/agents";
+
+const provider = new OpenAIProvider({ apiKey: process.env.OPENAI_API_KEY! });
+
+const weatherAgent = createAgent({
+  name: "weather-assistant",
+  description: "Looks up weather information for any location",
+  systemPrompt: "You are a weather assistant. Use the provided tools to look up weather.",
+  provider,
+  model: { model: "gpt-4o-mini" },
+  tools: [getWeatherTool],
+});
+
+const mathAgent = createAgent({
+  name: "math-assistant",
+  description: "Evaluates mathematical expressions and solves equations",
+  systemPrompt: "You are a math assistant. Use the provided tools to calculate.",
+  provider,
+  model: { model: "gpt-4o-mini" },
+  tools: [calculateTool],
+});
+
+const supervisor = createSupervisor({
+  name: "research-supervisor",
+  systemPrompt: "Break down requests and delegate to the right specialist.",
+  provider,
+  model: { model: "gpt-4o" },
+  workers: [weatherAgent, mathAgent],
+  maxRounds: 6,
+});
+
+const result = await supervisor.run(
+  "What is the weather in Tokyo and what is 42 * 17?"
+);
+console.log(result.output);
+```
+
+## SupervisorConfig
+
+| Field | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `name` | `string` | Yes | — | Supervisor agent name. |
+| `systemPrompt` | `string` | Yes | — | Base system prompt — enhanced automatically with worker descriptions. |
+| `provider` | `ModelProvider` | Yes | — | LLM provider instance. |
+| `model` | `ModelOptions` | Yes | — | Model configuration. |
+| `workers` | `Agent[]` | Yes | — | Worker agents available for delegation. |
+| `maxRounds` | `number` | No | `5` | Maximum delegation rounds before stopping. |
+
+## How it works
+
+1. The supervisor is itself an `Agent` instance returned by `createSupervisor()`.
+2. A synthetic `delegate_to_worker` tool is injected, with worker names exposed as an enum.
+3. The system prompt is enhanced with a list of available workers and their descriptions.
+4. The supervisor reasons, delegates tasks to workers via the tool, observes results, and repeats until done.
+5. `maxRounds` maps to `maxIterations` on the underlying agent — it controls how many reason/delegate cycles are allowed.
+
+## Using as a Synkro handler
+
+Since the supervisor is a standard `Agent`, it supports `asHandler()` for Synkro integration:
+
+```ts
+synkro.on("complex-request", supervisor.asHandler());
+```
+
+This gives you distributed locking, retries, and dead letter queues for free.
+
+<Aside type="tip">
+Always set `description` on worker agents — the supervisor uses these descriptions to decide which worker to delegate to. Without descriptions, the supervisor sees "no description" for each worker.
+</Aside>
+
+<Aside type="note">
+Workers run with the supervisor's `runId` and `synkroCtx`, so token usage and observability events flow through the same context.
+</Aside>
