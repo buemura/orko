@@ -6,6 +6,12 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-03-13
+
+### Added
+
+- **Debate Pattern** — `createDebate()` enables multi-agent collaboration where participants take turns debating a topic over configurable rounds with full shared transcript history. Supports an optional moderator agent that frames the debate and synthesizes a final conclusion. Returns `{ run(), asHandler() }` for standalone and Synkro-integrated use. Token usage is accumulated across all participants and rounds.
+
 ## [0.3.1] - 2026-03-13
 
 ### Changed

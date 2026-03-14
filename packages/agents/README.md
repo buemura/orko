@@ -222,6 +222,68 @@ type Tool<TInput, TOutput> = {
 
 Tools receive an `AgentContext` which extends Synkro's `HandlerCtx` with agent-specific fields (`agentName`, `runId`, `tokenUsage`).
 
+### `createDebate(config): { run, asHandler }`
+
+Creates a debate orchestration where multiple agents collaborate by discussing a topic over several rounds.
+
+```ts
+import { createAgent, createDebate, OpenAIProvider } from "@synkro/agents";
+
+const optimist = createAgent({
+  name: "optimist",
+  systemPrompt: "You argue in favor of the topic, highlighting benefits and opportunities.",
+  provider: new OpenAIProvider({ apiKey: process.env.OPENAI_API_KEY! }),
+  model: { model: "gpt-4o" },
+});
+
+const critic = createAgent({
+  name: "critic",
+  systemPrompt: "You challenge assumptions and highlight risks and downsides.",
+  provider: new OpenAIProvider({ apiKey: process.env.OPENAI_API_KEY! }),
+  model: { model: "gpt-4o" },
+});
+
+const moderator = createAgent({
+  name: "moderator",
+  systemPrompt: "You are a neutral moderator. Frame debates clearly and synthesize balanced conclusions.",
+  provider: new OpenAIProvider({ apiKey: process.env.OPENAI_API_KEY! }),
+  model: { model: "gpt-4o" },
+});
+
+const debate = createDebate({
+  name: "tech-debate",
+  participants: [optimist, critic],
+  moderator,       // optional: frames the topic and synthesizes conclusion
+  maxRounds: 3,    // default: 3
+});
+
+const result = await debate.run("Should we adopt microservices?");
+console.log(result.output);    // moderator's synthesis (or last round output if no moderator)
+console.log(result.rounds);    // full round-by-round contributions
+console.log(result.tokenUsage);
+```
+
+```ts
+type DebateConfig = {
+  name: string;
+  participants: Agent[];
+  maxRounds?: number;    // default: 3
+  moderator?: Agent;     // optional
+  onTokenUsage?: (usage: TokenUsage) => void;
+};
+
+type DebateResult = {
+  topic: string;
+  rounds: DebateRound[];
+  synthesis: string | undefined;
+  output: string;
+  tokenUsage: TokenUsage;
+  status: "completed" | "failed";
+};
+```
+
+Each round, every participant sees the full transcript of all previous contributions. The moderator (if provided) speaks first to frame the debate and last to synthesize the conclusion.
+
 ### `OpenAIProvider`
 
 ```ts

@@ -10,6 +10,13 @@ export { createRouter } from "./orchestration/router.js";
 export type { Route, RouterConfig } from "./orchestration/router.js";
 export { createSupervisor } from "./orchestration/supervisor.js";
 export type { SupervisorConfig } from "./orchestration/supervisor.js";
+export { createDebate } from "./orchestration/debate.js";
+export type {
+  DebateConfig,
+  DebateResult,
+  DebateRound,
+  DebateContribution,
+} from "./orchestration/debate.js";
 
 // LLM
 export type { ModelProvider } from "./llm/provider.js";
