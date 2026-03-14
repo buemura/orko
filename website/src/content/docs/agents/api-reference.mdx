@@ -2,7 +2,7 @@
 title: API Reference
 description: Complete API reference for @synkro/agents — all functions, classes, and types.
 sidebar:
-  order: 10
+  order: 11
 ---
 
 import { Badge } from '@astrojs/starlight/components';
@@ -54,6 +54,21 @@ function createPipeline(config: PipelineConfig): SynkroWorkflow;
 ```
 
 See [Synkro Integration](/agents/synkro-integration) for usage details.
+
+### createDebate(config) <Badge text="factory" />
+
+Creates a debate orchestration for multi-agent collaboration.
+
+```ts
+function createDebate(config: DebateConfig): {
+  run(topic: string, options?: AgentRunOptions): Promise<DebateResult>;
+  asHandler(): HandlerFunction;
+};
+```
+
+See [Debate](/agents/debate) for usage details.
+
+---
 
 ## Classes
 
@@ -407,5 +422,56 @@ type PipelineConfig = {
 type AgentStep = {
   agent: Agent | string;
   inputMapper?: (payload: unknown) => string;
+};
+```
+
+---
+
+### DebateConfig
+
+```ts
+type DebateConfig = {
+  name: string;
+  participants: Agent[];
+  maxRounds?: number;          // default: 3
+  moderator?: Agent;
+  onTokenUsage?: (usage: TokenUsage) => void;
+};
+```
+
+---
+
+### DebateResult
+
+```ts
+type DebateResult = {
+  topic: string;
+  rounds: DebateRound[];
+  synthesis: string | undefined;
+  output: string;
+  tokenUsage: TokenUsage;
+  status: "completed" | "failed";
+};
+```
+
+---
+
+### DebateRound
+
+```ts
+type DebateRound = {
+  roundNumber: number;
+  contributions: DebateContribution[];
+};
+```
+
+---
+
+### DebateContribution
+
+```ts
+type DebateContribution = {
+  agentName: string;
+  output: string;
 };
 ```

@@ -1,0 +1,135 @@
+---
+title: Debate
+description: Multi-agent collaboration where participants discuss and debate a topic over multiple rounds.
+sidebar:
+  order: 10
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+`createDebate()` creates a debate orchestration where multiple agents take turns discussing a topic over several rounds with full shared transcript history. An optional moderator agent can frame the debate and synthesize a final conclusion.
+
+## Creating a debate
+
+```ts
+import { createAgent, createDebate, OpenAIProvider } from "@synkro/agents";
+
+const provider = new OpenAIProvider({ apiKey: process.env.OPENAI_API_KEY! });
+
+const optimist = createAgent({
+  name: "optimist",
+  systemPrompt: "You argue in favor of the topic, highlighting benefits and opportunities.",
+  provider,
+  model: { model: "gpt-4o" },
+});
+
+const critic = createAgent({
+  name: "critic",
+  systemPrompt: "You challenge assumptions and highlight risks and downsides.",
+  provider,
+  model: { model: "gpt-4o" },
+});
+
+const debate = createDebate({
+  name: "tech-debate",
+  participants: [optimist, critic],
+  maxRounds: 3,
+});
+
+const result = await debate.run("Should we adopt microservices?");
+console.log(result.output);     // last round's combined outputs
+console.log(result.rounds);     // full round-by-round contributions
+console.log(result.tokenUsage); // accumulated across all participants
+```
+
+## With a moderator
+
+Add a moderator agent to frame the topic at the start and synthesize a conclusion after all rounds complete.
+
+```ts
+const moderator = createAgent({
+  name: "moderator",
+  systemPrompt:
+    "You are a neutral moderator. Frame debates clearly and synthesize balanced conclusions.",
+  provider,
+  model: { model: "gpt-4o" },
+});
+
+const debate = createDebate({
+  name: "moderated-debate",
+  participants: [optimist, critic],
+  moderator,
+  maxRounds: 3,
+});
+
+const result = await debate.run("Is AI replacing software engineers?");
+console.log(result.synthesis); // moderator's final conclusion
+console.log(result.output);   // same as synthesis when moderator is present
+```
+
+## DebateConfig
+
+| Field | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `name` | `string` | Yes | — | Debate name. |
+| `participants` | `Agent[]` | Yes | — | Agents that will debate (at least one). |
+| `maxRounds` | `number` | No | `3` | Number of debate rounds. |
+| `moderator` | `Agent` | No | — | Optional agent that frames the debate and synthesizes the conclusion. |
+| `onTokenUsage` | `(usage: TokenUsage) => void` | No | — | Callback invoked after each agent completes its turn. |
+
+## DebateResult
+
+| Field | Type | Description |
+|---|---|---|
+| `topic` | `string` | The original debate topic. |
+| `rounds` | `DebateRound[]` | All rounds with their contributions. |
+| `synthesis` | `string \| undefined` | Moderator's final synthesis, if a moderator was provided. |
+| `output` | `string` | The synthesis (if available) or the last round's concatenated outputs. |
+| `tokenUsage` | `TokenUsage` | Accumulated token usage across all participants and moderator. |
+| `status` | `"completed" \| "failed"` | Whether the debate completed successfully. |
+
+## How it works
+
+1. A shared transcript is initialized as an empty list.
+2. If a **moderator** is present, it runs first to frame the debate topic. Its output is added to the transcript.
+3. For each **round** (1 to `maxRounds`), every participant takes a turn sequentially. Each participant sees the full transcript of all previous contributions as context.
+4. After all rounds complete, if a **moderator** is present, it runs again with the full transcript to synthesize a final conclusion.
+5. The result's `output` is the moderator's synthesis (if available) or the last round's combined outputs.
+
+<Aside type="tip">
+Participants respond sequentially within each round — this ensures each speaker can reference the previous one's arguments. The full transcript is passed as context to every turn.
+</Aside>
+
+## Using as a Synkro handler
+
+The debate supports `asHandler()` for Synkro integration:
+
+```ts
+const handler = debate.asHandler();
+
+const synkro = await Synkro.start({
+  transport: "redis",
+  connectionUrl: "redis://localhost:6379",
+  events: [
+    { type: "debate:request", handler },
+  ],
+});
+
+await synkro.publish("debate:request", { input: "Should we use monorepos?" });
+```
+
+The handler reads `payload.input` as the debate topic and writes results via `ctx.setPayload()`:
+
+```ts
+{
+  debateOutput: "...",
+  debateSynthesis: "..." | undefined,
+  debateRounds: 3,
+  debateStatus: "completed",
+  debateTokenUsage: { promptTokens: 500, completionTokens: 300, totalTokens: 800 },
+}
+```
+
+<Aside type="note">
+If any participant returns a non-completed status (e.g., the LLM call fails), the debate stops early and returns `status: "failed"` with the partial rounds collected so far.
+</Aside>
